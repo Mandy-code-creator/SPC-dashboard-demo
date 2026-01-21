@@ -33,7 +33,9 @@ def load_limit():
 
 df = load_data()
 
-# 🔴 CHUẨN HÓA HEADER
+# =========================
+# NORMALIZE HEADERS
+# =========================
 df.columns = (
     df.columns
       .str.replace("\r\n", " ", regex=False)
@@ -119,19 +121,21 @@ def get_limit(color, prefix, factor):
 def prep_spc(df, north, south):
     tmp = df.copy()
     tmp["value"] = tmp[[north, south]].mean(axis=1)
-    return tmp.groupby("製造批號", as_index=False).agg(
+    out = tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=("value", "mean")
     )
+    return out.sort_values("Time")
 
 def prep_lab(df, col):
-    return df.groupby("製造批號", as_index=False).agg(
+    out = df.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=(col, "mean")
     )
+    return out.sort_values("Time")
 
 # =========================
-# SPC CHARTS (ĐẸP)
+# SPC CHARTS (BATCH ON X)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(13, 4))
@@ -140,13 +144,13 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     std = line["value"].std()
 
     ax.plot(
-        lab["Time"], lab["value"],
+        lab["製造批號"], lab["value"],
         marker="o", linewidth=1.5, markersize=5,
         label="LAB", color="#1f77b4"
     )
 
     ax.plot(
-        line["Time"], line["value"],
+        line["製造批號"], line["value"],
         marker="s", linewidth=1.5, markersize=5,
         label="LINE", color="#2ca02c"
     )
@@ -164,8 +168,10 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
         ax.axhline(line_lim[1], color="red", linewidth=2)
 
     ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.set_xlabel("Batch Code")
     ax.grid(True, linestyle="--", alpha=0.3)
     ax.legend(ncol=5, fontsize=9)
+    plt.xticks(rotation=45)
     fig.tight_layout()
     return fig
 
@@ -176,7 +182,7 @@ def spc_single(spc, title, limit, color):
     std = spc["value"].std()
 
     ax.plot(
-        spc["Time"], spc["value"],
+        spc["製造批號"], spc["value"],
         marker="o", linewidth=1.5, markersize=5,
         color=color
     )
@@ -190,7 +196,9 @@ def spc_single(spc, title, limit, color):
         ax.axhline(limit[1], color="red", linewidth=2)
 
     ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.set_xlabel("Batch Code")
     ax.grid(True, linestyle="--", alpha=0.3)
+    plt.xticks(rotation=45)
     fig.tight_layout()
     return fig
 
