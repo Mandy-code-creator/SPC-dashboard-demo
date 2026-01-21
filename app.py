@@ -34,6 +34,13 @@ def load_limits():
 
 df = load_data()
 limit_df = load_limits()
+# ===== NORMALIZE COLUMN NAMES =====
+df.columns = (
+    df.columns
+    .str.replace("\n", " ", regex=False)
+    .str.replace("  ", " ")
+    .str.strip()
+)
 
 # ======================
 # STANDARDIZE COLUMNS
@@ -176,3 +183,4 @@ for factor, line_c, lab_c in [
         f"{color}_{factor}_SPC.png",
         "image/png"
     )
+
