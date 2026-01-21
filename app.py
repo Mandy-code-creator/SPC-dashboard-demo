@@ -1,160 +1,112 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-from io import BytesIO
 
-# =====================================================
-# PAGE CONFIG
-# =====================================================
-st.set_page_config(page_title="SPC Dashboard", layout="wide")
-st.title("SPC Dashboard – LAB vs LINE (ΔL, Δa, Δb)")
+st.set_page_config(page_title="SPC Color Dashboard", layout="wide")
 
-# =====================================================
-# GOOGLE SHEET URLS
-# =====================================================
-DATA_SHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534"
-    "/gviz/tq?tqx=out:csv"
-)
+# =========================
+# GOOGLE SHEET LINKS
+# =========================
+DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
+LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
 
-LIMIT_SHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo"
-    "/gviz/tq?tqx=out:csv"
-)
-
-# =====================================================
+# =========================
 # LOAD DATA
-# =====================================================
-df = pd.read_csv(DATA_SHEET_URL)
-limit_df = pd.read_csv(LIMIT_SHEET_URL)
+# =========================
+@st.cache_data
+def load_data():
+    return pd.read_csv(DATA_URL)
 
-st.success("Google Sheets data loaded successfully.")
+@st.cache_data
+def load_limits():
+    return pd.read_csv(LIMIT_URL)
 
-# =====================================================
-# NORMALIZE COLUMN NAMES
-# =====================================================
-df.columns = (
-    df.columns
-    .str.replace("\n", " ", regex=False)
-    .str.replace("  ", " ", regex=False)
-    .str.strip()
-)
+df = load_data()
+limit_df = load_limits()
 
-limit_df.columns = (
-    limit_df.columns
-    .str.replace("\n", " ", regex=False)
-    .str.strip()
-)
+st.success("Data loaded successfully from Google Sheets")
 
-# =====================================================
-# RENAME MAIN DATA COLUMNS
-# =====================================================
-COLUMN_MAP = {
-    "製造批號": "batch",
-    "塗料編號": "color_code",
-    "Time": "time",
+# =========================
+# BASIC CLEANING
+# =========================
+df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
 
-    "Average value ΔL 正面": "dL_avg",
-    "Average value Δa 正面": "da_avg",
-    "Average value Δb 正面": "db_avg",
+df["dL_lab"] = df["入料檢測\n ΔL 正面"]
+df["da_lab"] = df["入料檢測\nΔa 正面"]
+df["db_lab"] = df["入料檢測\nΔb 正面"]
 
-    "入料檢測 ΔL 正面": "dL_input",
-    "入料檢測 Δa 正面": "da_input",
-    "入料檢測 Δb 正面": "db_input",
-}
+df["dL_line"] = df["Average value\nΔL 正面"]
+df["da_line"] = df["Average value\n Δa 正面"]
+df["db_line"] = df["Average value\nΔb 正面"]
 
-df = df.rename(columns=COLUMN_MAP)
-
-df["time"] = pd.to_datetime(df["time"], errors="coerce")
-
-# =====================================================
-# SIDEBAR FILTERS
-# =====================================================
+# =========================
+# FILTERS
+# =========================
 st.sidebar.header("Filters")
 
-color_list = sorted(df["color_code"].dropna().unique())
-selected_color = st.sidebar.selectbox("Select Color Code", color_list)
-
-df = df[df["color_code"] == selected_color]
-
-time_options = df["time"].dropna().sort_values().unique()
-selected_times = st.sidebar.multiselect(
-    "Select Production Time",
-    options=time_options,
-    default=time_options
+color_code = st.sidebar.selectbox(
+    "Color Code",
+    sorted(df["塗料編號"].dropna().unique())
 )
 
-df = df[df["time"].isin(selected_times)]
-
-# =====================================================
-# AGGREGATE DATA
-# =====================================================
-line_batch = (
-    df.groupby("batch")[["dL_avg", "da_avg", "db_avg"]]
-    .mean()
-    .reset_index()
+time_range = st.sidebar.date_input(
+    "Time range",
+    value=(df["Time"].min().date(), df["Time"].max().date())
 )
 
-lab_batch = (
-    df.groupby("batch")[["dL_input", "da_input", "db_input"]]
-    .first()
-    .reset_index()
-)
+df = df[
+    (df["塗料編號"] == color_code) &
+    (df["Time"].dt.date >= time_range[0]) &
+    (df["Time"].dt.date <= time_range[1])
+]
 
-# =====================================================
-# GET CONTROL LIMIT BY COLOR
-# =====================================================
-def get_limits_by_color(df, color_code):
-    row = df[df["Color_code"] == color_code]
+# =========================
+# GET LIMITS BY COLOR CODE
+# =========================
+limit_row = limit_df[limit_df["Color_code"] == color_code]
 
-    if row.empty:
-        return {
-            "dL": (None, None),
-            "da": (None, None),
-            "db": (None, None),
-        }
+def get_limit(col):
+    if limit_row.empty:
+        return None, None
+    return float(limit_row[col + "_LCL"]), float(limit_row[col + "_UCL"])
 
-    r = row.iloc[0]
+lab_limits = {
+    "dL": get_limit("ΔL"),
+    "da": get_limit("Δa"),
+    "db": get_limit("Δb"),
+}
 
-    return {
-        "dL": (r["ΔL LCL"], r["ΔL UCL"]),
-        "da": (r["Δa LCL"], r["Δa UCL"]),
-        "db": (r["Δb LCL"], r["Δb UCL"]),
-    }
+line_limits = lab_limits  # nếu sau này có LINE riêng → đổi tại đây
 
-limits = get_limits_by_color(limit_df, selected_color)
+# =========================
+# SIDEBAR – CONTROL LIMITS
+# =========================
+st.sidebar.header("LAB Control Limits")
 
-# =====================================================
-# SIDEBAR – CONTROL LIMIT (AUTO + OVERRIDE)
-# =====================================================
-def parse_limit(v):
-    try:
-        return float(v)
-    except:
-        return None
+lab_LCL_L, lab_UCL_L = st.sidebar.number_input(
+    "LAB ΔL LCL", value=lab_limits["dL"][0]), st.sidebar.number_input(
+    "LAB ΔL UCL", value=lab_limits["dL"][1])
 
-st.sidebar.header("LINE Control Limits (Internal)")
+lab_LCL_a, lab_UCL_a = st.sidebar.number_input(
+    "LAB Δa LCL", value=lab_limits["da"][0]), st.sidebar.number_input(
+    "LAB Δa UCL", value=lab_limits["da"][1])
 
-lcl_L_line = parse_limit(st.sidebar.text_input("ΔL LCL", value=str(limits["dL"][0])))
-ucl_L_line = parse_limit(st.sidebar.text_input("ΔL UCL", value=str(limits["dL"][1])))
+lab_LCL_b, lab_UCL_b = st.sidebar.number_input(
+    "LAB Δb LCL", value=lab_limits["db"][0]), st.sidebar.number_input(
+    "LAB Δb UCL", value=lab_limits["db"][1])
 
-lcl_a_line = parse_limit(st.sidebar.text_input("Δa LCL", value=str(limits["da"][0])))
-ucl_a_line = parse_limit(st.sidebar.text_input("Δa UCL", value=str(limits["da"][1])))
+st.sidebar.header("LINE Control Limits")
 
-lcl_b_line = parse_limit(st.sidebar.text_input("Δb LCL", value=str(limits["db"][0])))
-ucl_b_line = parse_limit(st.sidebar.text_input("Δb UCL", value=str(limits["db"][1])))
+line_LCL_L, line_UCL_L = lab_LCL_L, lab_UCL_L
+line_LCL_a, line_UCL_a = lab_LCL_a, lab_UCL_a
+line_LCL_b, line_UCL_b = lab_LCL_b, lab_UCL_b
 
-# =====================================================
-# SPC PLOT FUNCTIONS
-# =====================================================
-def spc_chart(df, y_col, title, ylabel, lcl_manual=None, ucl_manual=None):
+# =========================
+# SPC FUNCTION
+# =========================
+def spc_chart(df, y_col, title, lcl, ucl):
     y = df[y_col].dropna()
-    if y.empty:
-        st.warning("No data available.")
-        return
-
     mean = y.mean()
     std = y.std()
 
@@ -162,49 +114,32 @@ def spc_chart(df, y_col, title, ylabel, lcl_manual=None, ucl_manual=None):
     lcl_auto = mean - 3 * std
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(df["batch"], df[y_col], marker="o", label="Process")
-
-    ax.axhline(mean, linestyle="--", label="CL")
+    ax.plot(y.index, y, marker="o", label="Data")
+    ax.axhline(mean, linestyle="--", label="Mean")
     ax.axhline(ucl_auto, linestyle="--", color="red", label="UCL ±3σ")
     ax.axhline(lcl_auto, linestyle="--", color="red", label="LCL ±3σ")
 
-    if ucl_manual is not None:
-        ax.axhline(ucl_manual, linestyle="-.", color="orange", label="Internal UCL")
-    if lcl_manual is not None:
-        ax.axhline(lcl_manual, linestyle="-.", color="orange", label="Internal LCL")
+    ax.axhline(ucl, linestyle="-.", color="orange", label="Manual UCL")
+    ax.axhline(lcl, linestyle="-.", color="orange", label="Manual LCL")
 
     ax.set_title(title)
-    ax.set_xlabel("Batch")
-    ax.set_ylabel(ylabel)
     ax.legend()
-
     st.pyplot(fig)
 
-    buf = BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    buf.seek(0)
+# =========================
+# DASHBOARD
+# =========================
+st.title("SPC Color Control Dashboard")
 
-    st.download_button(
-        "📥 Download chart",
-        data=buf,
-        file_name=f"{title}.png",
-        mime="image/png"
-    )
+st.subheader("COMBINED SPC (LAB vs LINE – LINE LIMIT PRIORITY)")
+spc_chart(df, "dL_line", "COMBINED ΔL", line_LCL_L, line_UCL_L)
 
-    plt.close(fig)
+st.subheader("LAB SPC")
+spc_chart(df, "dL_lab", "LAB ΔL", lab_LCL_L, lab_UCL_L)
+spc_chart(df, "da_lab", "LAB Δa", lab_LCL_a, lab_UCL_a)
+spc_chart(df, "db_lab", "LAB Δb", lab_LCL_b, lab_UCL_b)
 
-# =====================================================
-# DISPLAY
-# =====================================================
-st.header(f"SPC Charts – Color Code: {selected_color}")
-
-tabs = st.tabs(["ΔL", "Δa", "Δb"])
-
-with tabs[0]:
-    spc_chart(line_batch, "dL_avg", "SPC ΔL – LINE", "ΔL", lcl_L_line, ucl_L_line)
-
-with tabs[1]:
-    spc_chart(line_batch, "da_avg", "SPC Δa – LINE", "Δa", lcl_a_line, ucl_a_line)
-
-with tabs[2]:
-    spc_chart(line_batch, "db_avg", "SPC Δb – LINE", "Δb", lcl_b_line, ucl_b_line)
+st.subheader("LINE SPC")
+spc_chart(df, "dL_line", "LINE ΔL", line_LCL_L, line_UCL_L)
+spc_chart(df, "da_line", "LINE Δa", line_LCL_a, line_UCL_a)
+spc_chart(df, "db_line", "LINE Δb", line_LCL_b, line_UCL_b)
