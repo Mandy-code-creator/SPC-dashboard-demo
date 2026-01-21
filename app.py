@@ -1,170 +1,210 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from io import BytesIO
 
-st.set_page_config(
-    page_title="SPC Dashboard",
-    layout="wide",
-    page_icon="📊"
+# =====================================================
+# PAGE CONFIG
+# =====================================================
+st.set_page_config(page_title="SPC Dashboard", layout="wide")
+st.title("SPC Dashboard – LAB vs LINE (ΔL, Δa, Δb)")
+
+# =====================================================
+# GOOGLE SHEET URLS
+# =====================================================
+DATA_SHEET_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534"
+    "/gviz/tq?tqx=out:csv"
 )
 
-# ================== GOOGLE SHEET ==================
-DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
-LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
+LIMIT_SHEET_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo"
+    "/gviz/tq?tqx=out:csv"
+)
 
-@st.cache_data
-def load_data():
-    df = pd.read_csv(DATA_URL)
-    limit = pd.read_csv(LIMIT_URL)
+# =====================================================
+# LOAD DATA
+# =====================================================
+df = pd.read_csv(DATA_SHEET_URL)
+limit_df = pd.read_csv(LIMIT_SHEET_URL)
 
-    # normalize header
-    df.columns = df.columns.str.replace("\n", " ").str.strip()
-    limit.columns = limit.columns.str.replace("\n", " ").str.strip()
+st.success("Google Sheets data loaded successfully.")
 
-    return df, limit
+# =====================================================
+# NORMALIZE COLUMN NAMES
+# =====================================================
+df.columns = (
+    df.columns
+    .str.replace("\n", " ", regex=False)
+    .str.replace("  ", " ", regex=False)
+    .str.strip()
+)
 
-df, limit_df = load_data()
+limit_df.columns = (
+    limit_df.columns
+    .str.replace("\n", " ", regex=False)
+    .str.strip()
+)
 
-# ================== SAFE COLUMN MAP ==================
-COL = {
-    "batch":  [c for c in df.columns if "製造批號" in c][0],
-    "color":  [c for c in df.columns if "塗料編號" in c][0],
-    "time":   [c for c in df.columns if c == "Time"][0],
+# =====================================================
+# RENAME MAIN DATA COLUMNS
+# =====================================================
+COLUMN_MAP = {
+    "製造批號": "batch",
+    "塗料編號": "color_code",
+    "Time": "time",
 
-    "dL_n":   [c for c in df.columns if "正-北" in c and "ΔL" in c][0],
-    "dL_s":   [c for c in df.columns if "正-南" in c and "ΔL" in c][0],
-    "da_n":   [c for c in df.columns if "正-北" in c and "Δa" in c][0],
-    "da_s":   [c for c in df.columns if "正-南" in c and "Δa" in c][0],
-    "db_n":   [c for c in df.columns if "正-北" in c and "Δb" in c][0],
-    "db_s":   [c for c in df.columns if "正-南" in c and "Δb" in c][0],
+    "Average value ΔL 正面": "dL_avg",
+    "Average value Δa 正面": "da_avg",
+    "Average value Δb 正面": "db_avg",
 
-    "lab_dL": [c for c in df.columns if "入料檢測" in c and "ΔL" in c][0],
-    "lab_da": [c for c in df.columns if "入料檢測" in c and "Δa" in c][0],
-    "lab_db": [c for c in df.columns if "入料檢測" in c and "Δb" in c][0],
+    "入料檢測 ΔL 正面": "dL_input",
+    "入料檢測 Δa 正面": "da_input",
+    "入料檢測 Δb 正面": "db_input",
 }
 
-# ================== CLEAN ==================
-df[COL["batch"]] = df[COL["batch"]].astype(str).str.strip()
-df[COL["color"]] = df[COL["color"]].astype(str).str.strip()
-df[COL["time"]]  = pd.to_datetime(df[COL["time"]], errors="coerce")
+df = df.rename(columns=COLUMN_MAP)
 
-df["Year"] = df[COL["time"]].dt.year
-df["Month"] = df[COL["time"]].dt.month
+df["time"] = pd.to_datetime(df["time"], errors="coerce")
 
-# ================== SIDEBAR ==================
-with st.sidebar:
-    st.header("⏱ Time Filter")
+# =====================================================
+# SIDEBAR FILTERS
+# =====================================================
+st.sidebar.header("Filters")
 
-    latest_year = int(df["Year"].max())
-    year = st.selectbox("Year", ["All"] + sorted(df["Year"].dropna().unique()),
-                        index=sorted(df["Year"].dropna().unique()).index(latest_year)+1)
-    month = st.selectbox("Month", ["All"] + list(range(1, 13)))
+color_list = sorted(df["color_code"].dropna().unique())
+selected_color = st.sidebar.selectbox("Select Color Code", color_list)
 
-    if year != "All":
-        df = df[df["Year"] == int(year)]
-    if month != "All":
-        df = df[df["Month"] == int(month)]
+df = df[df["color_code"] == selected_color]
 
-    st.divider()
-    color = st.selectbox("🎨 Color code", sorted(df[COL["color"]].unique()))
+time_options = df["time"].dropna().sort_values().unique()
+selected_times = st.sidebar.multiselect(
+    "Select Production Time",
+    options=time_options,
+    default=time_options
+)
 
-df = df[df[COL["color"]] == color]
+df = df[df["time"].isin(selected_times)]
 
-# ================== LIMIT ==================
-def get_limit(metric, source):
-    row = limit_df[limit_df["Color_code"] == color]
+# =====================================================
+# AGGREGATE DATA
+# =====================================================
+line_batch = (
+    df.groupby("batch")[["dL_avg", "da_avg", "db_avg"]]
+    .mean()
+    .reset_index()
+)
+
+lab_batch = (
+    df.groupby("batch")[["dL_input", "da_input", "db_input"]]
+    .first()
+    .reset_index()
+)
+
+# =====================================================
+# GET CONTROL LIMIT BY COLOR
+# =====================================================
+def get_limits_by_color(df, color_code):
+    row = df[df["Color_code"] == color_code]
+
     if row.empty:
-        return None, None
-    return (
-        row[f"{source} {metric} LCL"].values[0],
-        row[f"{source} {metric} UCL"].values[0]
-    )
+        return {
+            "dL": (None, None),
+            "da": (None, None),
+            "db": (None, None),
+        }
 
-# ================== SPC CALC ==================
-def calc_spc(n_col, s_col):
-    d = df[[COL["batch"], COL["time"], n_col, s_col]].copy()
-    d[n_col] = pd.to_numeric(d[n_col], errors="coerce")
-    d[s_col] = pd.to_numeric(d[s_col], errors="coerce")
+    r = row.iloc[0]
 
-    d["value"] = d[[n_col, s_col]].mean(axis=1)
+    return {
+        "dL": (r["ΔL LCL"], r["ΔL UCL"]),
+        "da": (r["Δa LCL"], r["Δa UCL"]),
+        "db": (r["Δb LCL"], r["Δb UCL"]),
+    }
 
-    return (
-        d.groupby(COL["batch"])
-        .agg(
-            SPC=("value", "mean"),
-            Time=(COL["time"], "max")
-        )
-        .reset_index()
-        .sort_values("Time")
-    )
+limits = get_limits_by_color(limit_df, selected_color)
 
-# ================== SPC CHART ==================
-def spc_chart(spc, metric, combined=True):
-    mean = spc["SPC"].mean()
-    std = spc["SPC"].std()
+# =====================================================
+# SIDEBAR – CONTROL LIMIT (AUTO + OVERRIDE)
+# =====================================================
+def parse_limit(v):
+    try:
+        return float(v)
+    except:
+        return None
 
-    lab_lcl, lab_ucl = get_limit(metric, "LAB")
-    line_lcl, line_ucl = get_limit(metric, "LINE")
+st.sidebar.header("LINE Control Limits (Internal)")
 
-    colors = []
-    for v in spc["SPC"]:
-        if line_lcl is not None and (v < line_lcl or v > line_ucl):
-            colors.append("red")        # internal spec NG
-        elif abs(v - mean) > 3 * std:
-            colors.append("orange")     # 3σ NG
-        else:
-            colors.append("#1f77b4")
+lcl_L_line = parse_limit(st.sidebar.text_input("ΔL LCL", value=str(limits["dL"][0])))
+ucl_L_line = parse_limit(st.sidebar.text_input("ΔL UCL", value=str(limits["dL"][1])))
 
-    fig = go.Figure()
+lcl_a_line = parse_limit(st.sidebar.text_input("Δa LCL", value=str(limits["da"][0])))
+ucl_a_line = parse_limit(st.sidebar.text_input("Δa UCL", value=str(limits["da"][1])))
 
-    fig.add_trace(go.Scatter(
-        x=spc[COL["batch"]],
-        y=spc["SPC"],
-        mode="lines+markers",
-        marker=dict(size=10, color=colors),
-        name="SPC"
-    ))
+lcl_b_line = parse_limit(st.sidebar.text_input("Δb LCL", value=str(limits["db"][0])))
+ucl_b_line = parse_limit(st.sidebar.text_input("Δb UCL", value=str(limits["db"][1])))
 
-    # limits
-    for val, name, style in [
-        (lab_lcl, "LAB LCL", "dash"),
-        (lab_ucl, "LAB UCL", "dash"),
-        (line_lcl, "LINE LCL", "dot"),
-        (line_ucl, "LINE UCL", "dot"),
-        (mean + 3*std, "+3σ", "dashdot"),
-        (mean - 3*std, "-3σ", "dashdot"),
-    ]:
-        if val is not None:
-            fig.add_hline(y=val, line_dash=style, annotation_text=name)
+# =====================================================
+# SPC PLOT FUNCTIONS
+# =====================================================
+def spc_chart(df, y_col, title, ylabel, lcl_manual=None, ucl_manual=None):
+    y = df[y_col].dropna()
+    if y.empty:
+        st.warning("No data available.")
+        return
 
-    fig.update_layout(
-        height=450,
-        template="plotly_white",
-        title=f"{metric} SPC – {color}",
-        xaxis_title="Batch",
-        yaxis_title=metric
-    )
-    return fig
+    mean = y.mean()
+    std = y.std()
 
-# ================== MAIN ==================
-st.title("📊 SPC Dashboard")
+    ucl_auto = mean + 3 * std
+    lcl_auto = mean - 3 * std
 
-MAP = {
-    "ΔL": (COL["dL_n"], COL["dL_s"]),
-    "Δa": (COL["da_n"], COL["da_s"]),
-    "Δb": (COL["db_n"], COL["db_s"]),
-}
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(df["batch"], df[y_col], marker="o", label="Process")
 
-for metric, cols in MAP.items():
-    spc = calc_spc(cols[0], cols[1])
+    ax.axhline(mean, linestyle="--", label="CL")
+    ax.axhline(ucl_auto, linestyle="--", color="red", label="UCL ±3σ")
+    ax.axhline(lcl_auto, linestyle="--", color="red", label="LCL ±3σ")
 
-    st.subheader(f"COMBINED {metric}")
-    fig = spc_chart(spc, metric)
-    st.plotly_chart(fig, use_container_width=True)
+    if ucl_manual is not None:
+        ax.axhline(ucl_manual, linestyle="-.", color="orange", label="Internal UCL")
+    if lcl_manual is not None:
+        ax.axhline(lcl_manual, linestyle="-.", color="orange", label="Internal LCL")
+
+    ax.set_title(title)
+    ax.set_xlabel("Batch")
+    ax.set_ylabel(ylabel)
+    ax.legend()
+
+    st.pyplot(fig)
+
+    buf = BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    buf.seek(0)
 
     st.download_button(
-        f"⬇ Download {metric}",
-        fig.to_image(format="png"),
-        file_name=f"{color}_{metric}_SPC.png"
+        "📥 Download chart",
+        data=buf,
+        file_name=f"{title}.png",
+        mime="image/png"
     )
+
+    plt.close(fig)
+
+# =====================================================
+# DISPLAY
+# =====================================================
+st.header(f"SPC Charts – Color Code: {selected_color}")
+
+tabs = st.tabs(["ΔL", "Δa", "Δb"])
+
+with tabs[0]:
+    spc_chart(line_batch, "dL_avg", "SPC ΔL – LINE", "ΔL", lcl_L_line, ucl_L_line)
+
+with tabs[1]:
+    spc_chart(line_batch, "da_avg", "SPC Δa – LINE", "Δa", lcl_a_line, ucl_a_line)
+
+with tabs[2]:
+    spc_chart(line_batch, "db_avg", "SPC Δb – LINE", "Δb", lcl_b_line, ucl_b_line)
