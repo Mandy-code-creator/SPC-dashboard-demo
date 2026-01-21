@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # =========================
-# CUSTOM CSS (SIDEBAR + TABLE)
+# SIDEBAR STYLE
 # =========================
 st.markdown(
     """
@@ -91,7 +91,7 @@ if month:
 st.sidebar.divider()
 
 # =========================
-# LIMIT DISPLAY (2 DECIMALS)
+# LIMIT DISPLAY (FIX 2 DECIMALS)
 # =========================
 def show_limits(factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -100,22 +100,24 @@ def show_limits(factor):
         return
 
     st.sidebar.markdown(f"**{factor} Control Limits**")
-    styled = (
-        row.filter(like=factor)
-        .round(2)
-        .style
-        .set_properties(**{
-            "background-color": "#eef6ff" if factor == "LAB" else "#eefaf0",
-            "border": "1px solid #ddd"
-        })
+
+    table = row.filter(like=factor).copy()
+
+    # 🔴 ÉP HIỂN THỊ 2 CHỮ SỐ THẬP PHÂN
+    for c in table.columns:
+        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+
+    st.sidebar.dataframe(
+        table,
+        use_container_width=True,
+        hide_index=True
     )
-    st.sidebar.dataframe(styled, use_container_width=True, hide_index=True)
 
 show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# LIMIT FUNCTION
+# LIMIT FUNCTION (LOGIC GỐC)
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
