@@ -32,6 +32,10 @@ def load_limit():
     return pd.read_csv(LIMIT_URL)
 
 df = load_data()
+
+# ✅ FIX DUY NHẤT – CHUẨN HÓA TÊN CỘT (KHÔNG ĐỔI TÍNH NĂNG)
+df.columns = df.columns.str.replace("\n ", "\n", regex=False).str.strip()
+
 limit_df = load_limit()
 
 # =========================
@@ -168,8 +172,8 @@ def download(fig, name):
 # =========================
 spc = {
     "ΔL": {
-        "lab": prep_lab(df, "入料檢測\n ΔL 正面"),
-        "line": prep_spc(df, "正-北\n ΔL", "正-南\nΔL")
+        "lab": prep_lab(df, "入料檢測\nΔL 正面"),
+        "line": prep_spc(df, "正-北\nΔL", "正-南\nΔL")
     },
     "Δa": {
         "lab": prep_lab(df, "入料檢測\nΔa 正面"),
