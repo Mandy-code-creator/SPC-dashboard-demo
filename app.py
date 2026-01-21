@@ -1,17 +1,9 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-import io
+from datetime import datetime
 
-# =========================
-# PAGE CONFIG
-# =========================
-st.set_page_config(
-    page_title="SPC Color Dashboard",
-    layout="wide",
-    page_icon="📊"
-)
+st.set_page_config(page_title="SPC Color Dashboard", layout="wide")
 
 # =========================
 # GOOGLE SHEET LINKS
@@ -22,194 +14,174 @@ LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK
 # =========================
 # LOAD DATA
 # =========================
-@st.cache_data
+@st.cache_data(ttl=300)
 def load_data():
     df = pd.read_csv(DATA_URL)
-    df.columns = (
-        df.columns
-        .str.replace("\n", " ", regex=False)
-        .str.replace("  ", " ")
-        .str.strip()
-    )
-    df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
+    df["Time"] = pd.to_datetime(df["Time"])
     return df
 
-@st.cache_data
+@st.cache_data(ttl=300)
 def load_limit():
-    lim = pd.read_csv(LIMIT_URL)
-    lim.columns = lim.columns.str.strip()
-    return lim
+    return pd.read_csv(LIMIT_URL)
 
 df = load_data()
 limit_df = load_limit()
 
 # =========================
-# COLUMN MAP (AFTER NORMALIZE)
+# SIDEBAR – FILTER
 # =========================
-COL = {
-    "color": "塗料編號",
-    "batch": "製造批號",
+st.sidebar.header("📌 Filter")
 
-    "dL_N": "正-北 ΔL",
-    "dL_S": "正-南 ΔL",
-    "da_N": "正-北 Δa",
-    "da_S": "正-南 Δa",
-    "db_N": "正-北 Δb",
-    "db_S": "正-南 Δb",
+color = st.sidebar.selectbox(
+    "Color code",
+    sorted(df["塗料編號"].dropna().unique())
+)
 
-    "lab_dL": "入料檢測 ΔL 正面",
-    "lab_da": "入料檢測 Δa 正面",
-    "lab_db": "入料檢測 Δb 正面",
-}
+df = df[df["塗料編號"] == color]
 
-# =========================
-# CALCULATE LINE (COIL LEVEL)
-# =========================
-df["dL_line"] = df[[COL["dL_N"], COL["dL_S"]]].astype(float).mean(axis=1)
-df["da_line"] = df[[COL["da_N"], COL["da_S"]]].astype(float).mean(axis=1)
-df["db_line"] = df[[COL["db_N"], COL["db_S"]]].astype(float).mean(axis=1)
-
-df["dL_lab"] = df[COL["lab_dL"]]
-df["da_lab"] = df[COL["lab_da"]]
-df["db_lab"] = df[COL["lab_db"]]
-
-# =========================
-# SIDEBAR FILTER
-# =========================
-st.sidebar.header("🎛 Filter")
-
-years = sorted(df["Time"].dt.year.dropna().unique())
-default_year = max(years) if years else None
+latest_year = df["Time"].dt.year.max()
 year = st.sidebar.selectbox(
-    "Year", [None] + years,
-    index=years.index(default_year) + 1 if default_year else 0
+    "Year",
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
 )
 
-month = st.sidebar.selectbox("Month", [None] + list(range(1, 13)))
+month = st.sidebar.multiselect(
+    "Month (optional)",
+    sorted(df["Time"].dt.month.unique())
+)
 
-colors = sorted(df[COL["color"]].dropna().unique())
-color = st.sidebar.selectbox("🎨 Color Code", colors)
-
-if year:
-    df = df[df["Time"].dt.year == year]
+df = df[df["Time"].dt.year == year]
 if month:
-    df = df[df["Time"].dt.month == month]
+    df = df[df["Time"].dt.month.isin(month)]
 
-df = df[df[COL["color"]] == color]
-
-# =========================
-# AGGREGATE BY BATCH (SPC CORE)
-# =========================
-batch_df = (
-    df
-    .groupby(COL["batch"], as_index=False)
-    .agg(
-        dL_line=("dL_line", "mean"),
-        da_line=("da_line", "mean"),
-        db_line=("db_line", "mean"),
-
-        dL_lab=("dL_lab", "mean"),
-        da_lab=("da_lab", "mean"),
-        db_lab=("db_lab", "mean"),
-
-        batch_time=("Time", "min")
-    )
-    .sort_values("batch_time")
-    .reset_index(drop=True)
-)
-
-st.title(f"📊 X-bar Control Chart — {color}")
-st.caption("Each point = average of coils within one batch")
+st.sidebar.markdown("---")
 
 # =========================
-# GET LIMIT (LAB / LINE)
+# GET LIMIT FUNCTION
 # =========================
-def get_limit(color, factor):
+def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
     if row.empty:
         return None, None
-    try:
-        return (
-            float(row[f"{factor} LCL"].values[0]),
-            float(row[f"{factor} UCL"].values[0]),
-        )
-    except:
-        return None, None
+    return (
+        row[f"{factor} {prefix} LCL"].values[0],
+        row[f"{factor} {prefix} UCL"].values[0]
+    )
 
 # =========================
-# SPC CHART (LAB + LINE)
+# PREPARE SPC DATA
 # =========================
-def spc_chart(df, line_col, lab_col, factor):
-    fig, ax = plt.subplots(figsize=(14, 5))
+def prep_spc(df, north_col, south_col):
+    tmp = df.copy()
+    tmp["value"] = tmp[[north_col, south_col]].mean(axis=1)
+    return tmp.groupby("製造批號", as_index=False).agg(
+        Time=("Time", "min"),
+        value=("value", "mean")
+    )
 
-    x = np.arange(1, len(df) + 1)
-    y_line = df[line_col]
-    y_lab = df[lab_col]
+def prep_lab(df, col):
+    return df.groupby("製造批號", as_index=False).agg(
+        Time=("Time", "min"),
+        value=(col, "mean")
+    )
 
-    lab_lcl, lab_ucl = get_limit(color, factor)
-    line_lcl, line_ucl = get_limit(color, factor)
+# =========================
+# SPC CHART FUNCTION
+# =========================
+def spc_chart(spc_lab, spc_line, title, lab_limit, line_limit):
+    fig, ax = plt.subplots(figsize=(12, 4))
 
-    # DATA
-    ax.plot(x, y_lab, marker="^", color="green", label=f"{factor}* 入料")
-    ax.plot(x, y_line, marker="o", color="orange", label=f"{factor}* 產出")
+    # Mean & sigma (LINE)
+    mean = spc_line["value"].mean()
+    std = spc_line["value"].std()
+    ucl_3s = mean + 3 * std
+    lcl_3s = mean - 3 * std
 
-    # LAB LIMIT
-    if lab_lcl is not None:
-        ax.axhline(lab_lcl, color="purple", label="LCL 入料")
-    if lab_ucl is not None:
-        ax.axhline(lab_ucl, color="purple", label="UCL 入料")
+    # Plot LAB & LINE
+    ax.plot(spc_lab["Time"], spc_lab["value"], marker="o", label="LAB", color="blue")
+    ax.plot(spc_line["Time"], spc_line["value"], marker="o", label="LINE", color="green")
 
-    # LINE LIMIT
-    if line_lcl is not None:
-        ax.axhline(line_lcl, color="red", linestyle="--", label="LCL 產出")
-    if line_ucl is not None:
-        ax.axhline(line_ucl, color="red", linestyle="--", label="UCL 產出")
+    # ±3σ
+    ax.axhline(ucl_3s, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(lcl_3s, color="orange", linestyle="--", label="-3σ")
 
-    # NG POINT (LINE ONLY)
-    for i, v in enumerate(y_line):
-        if line_lcl is not None and line_ucl is not None:
-            if v < line_lcl or v > line_ucl:
-                ax.scatter(x[i], v, color="red", s=90, zorder=5)
+    # LAB limit
+    if lab_limit[0] is not None:
+        ax.axhline(lab_limit[0], color="blue", linestyle=":")
+        ax.axhline(lab_limit[1], color="blue", linestyle=":")
 
-    ax.set_title(f"X-bar Control chart {factor}*")
-    ax.set_xlabel("Batch order")
-    ax.set_ylabel(factor)
+    # LINE limit
+    if line_limit[0] is not None:
+        ax.axhline(line_limit[0], color="red", linestyle="-")
+        ax.axhline(line_limit[1], color="red", linestyle="-")
+
+    # Highlight points
+    for _, r in spc_line.iterrows():
+        if line_limit[0] is not None and (r["value"] < line_limit[0] or r["value"] > line_limit[1]):
+            ax.scatter(r["Time"], r["value"], color="red", s=80)
+        elif r["value"] < lcl_3s or r["value"] > ucl_3s:
+            ax.scatter(r["Time"], r["value"], color="orange", s=80)
+
+    ax.set_title(title)
     ax.legend()
     ax.grid(True)
 
     return fig
 
 # =========================
-# COMBINED SPC FIRST (ΔL)
+# PREP SPC DATA
 # =========================
-st.subheader("🔗 COMBINED SPC (Batch Average)")
-
-fig = spc_chart(batch_df, "dL_line", "dL_lab", "ΔL")
-st.pyplot(fig)
-
-buf = io.BytesIO()
-fig.savefig(buf, format="png")
-buf.seek(0)
-st.download_button("📥 Export ΔL SPC", buf, f"{color}_ΔL_SPC.png", "image/png")
+spc = {
+    "ΔL": {
+        "lab": prep_lab(df, "入料檢測\n ΔL 正面"),
+        "line": prep_spc(df, "正-北\n ΔL", "正-南\nΔL")
+    },
+    "Δa": {
+        "lab": prep_lab(df, "入料檢測\nΔa 正面"),
+        "line": prep_spc(df, "正-北\nΔa", "正-南\nΔa")
+    },
+    "Δb": {
+        "lab": prep_lab(df, "入料檢測\nΔb 正面"),
+        "line": prep_spc(df, "正-北\nΔb", "正-南\nΔb")
+    }
+}
 
 # =========================
-# INDIVIDUAL SPC
+# MAIN
 # =========================
-for factor, line_c, lab_c in [
-    ("ΔL", "dL_line", "dL_lab"),
-    ("Δa", "da_line", "da_lab"),
-    ("Δb", "db_line", "db_lab"),
-]:
-    st.subheader(f"{factor} SPC")
-    fig = spc_chart(batch_df, line_c, lab_c, factor)
+st.title(f"🎨 SPC Color Dashboard – {color}")
+
+# === COMBINED FIRST ===
+st.subheader("📊 COMBINED SPC")
+
+for k in ["ΔL", "Δa", "Δb"]:
+    lab_l = get_limit(color, k, "LAB")
+    line_l = get_limit(color, k, "LINE")
+
+    fig = spc_chart(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        lab_l,
+        line_l
+    )
     st.pyplot(fig)
 
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png")
-    buf.seek(0)
-    st.download_button(
-        f"📥 Export {factor}",
-        buf,
-        f"{color}_{factor}_SPC.png",
-        "image/png"
+st.markdown("---")
+
+# === INDIVIDUAL ===
+for k in ["ΔL", "Δa", "Δb"]:
+    st.subheader(f"📈 SPC {k}")
+
+    lab_l = get_limit(color, k, "LAB")
+    line_l = get_limit(color, k, "LINE")
+
+    fig = spc_chart(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"{k} SPC",
+        lab_l,
+        line_l
     )
+    st.pyplot(fig)
