@@ -1,9 +1,16 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+import io
 
-st.set_page_config(page_title="SPC Color Dashboard", layout="wide")
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="SPC Color Dashboard",
+    page_icon="🎨",
+    layout="wide"
+)
 
 # =========================
 # GOOGLE SHEET LINKS
@@ -30,7 +37,7 @@ limit_df = load_limit()
 # =========================
 # SIDEBAR – FILTER
 # =========================
-st.sidebar.header("📌 Filter")
+st.sidebar.title("🎨 Filter")
 
 color = st.sidebar.selectbox(
     "Color code",
@@ -55,10 +62,28 @@ df = df[df["Time"].dt.year == year]
 if month:
     df = df[df["Time"].dt.month.isin(month)]
 
-st.sidebar.markdown("---")
+st.sidebar.divider()
 
 # =========================
-# GET LIMIT FUNCTION
+# LIMIT DISPLAY
+# =========================
+def show_limits(factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        st.sidebar.warning(f"No {factor} limits")
+        return
+    st.sidebar.markdown(f"**{factor} Control Limits**")
+    st.sidebar.dataframe(
+        row.filter(like=factor),
+        use_container_width=True,
+        hide_index=True
+    )
+
+show_limits("LAB")
+show_limits("LINE")
+
+# =========================
+# LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -70,11 +95,11 @@ def get_limit(color, prefix, factor):
     )
 
 # =========================
-# PREPARE SPC DATA
+# PREP SPC DATA
 # =========================
-def prep_spc(df, north_col, south_col):
+def prep_spc(df, north, south):
     tmp = df.copy()
-    tmp["value"] = tmp[[north_col, south_col]].mean(axis=1)
+    tmp["value"] = tmp[[north, south]].mean(axis=1)
     return tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=("value", "mean")
@@ -87,50 +112,59 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHART FUNCTION
+# SPC CHARTS
 # =========================
-def spc_chart(spc_lab, spc_line, title, lab_limit, line_limit):
+def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    # Mean & sigma (LINE)
-    mean = spc_line["value"].mean()
-    std = spc_line["value"].std()
-    ucl_3s = mean + 3 * std
-    lcl_3s = mean - 3 * std
+    mean = line["value"].mean()
+    std = line["value"].std()
 
-    # Plot LAB & LINE
-    ax.plot(spc_lab["Time"], spc_lab["value"], marker="o", label="LAB", color="blue")
-    ax.plot(spc_line["Time"], spc_line["value"], marker="o", label="LINE", color="green")
+    ax.plot(lab["Time"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["Time"], line["value"], "o-", label="LINE", color="#2ca02c")
 
-    # ±3σ
-    ax.axhline(ucl_3s, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(lcl_3s, color="orange", linestyle="--", label="-3σ")
+    ax.axhline(mean + 3*std, color="orange", linestyle="--")
+    ax.axhline(mean - 3*std, color="orange", linestyle="--")
 
-    # LAB limit
-    if lab_limit[0] is not None:
-        ax.axhline(lab_limit[0], color="blue", linestyle=":")
-        ax.axhline(lab_limit[1], color="blue", linestyle=":")
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
 
-    # LINE limit
-    if line_limit[0] is not None:
-        ax.axhline(line_limit[0], color="red", linestyle="-")
-        ax.axhline(line_limit[1], color="red", linestyle="-")
-
-    # Highlight points
-    for _, r in spc_line.iterrows():
-        if line_limit[0] is not None and (r["value"] < line_limit[0] or r["value"] > line_limit[1]):
-            ax.scatter(r["Time"], r["value"], color="red", s=80)
-        elif r["value"] < lcl_3s or r["value"] > ucl_3s:
-            ax.scatter(r["Time"], r["value"], color="orange", s=80)
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red")
+        ax.axhline(line_lim[1], color="red")
 
     ax.set_title(title)
     ax.legend()
     ax.grid(True)
-
     return fig
 
+def spc_single(spc, title, limit, color):
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    mean = spc["value"].mean()
+    std = spc["value"].std()
+
+    ax.plot(spc["Time"], spc["value"], "o-", color=color)
+    ax.axhline(mean + 3*std, color="orange", linestyle="--")
+    ax.axhline(mean - 3*std, color="orange", linestyle="--")
+
+    if limit[0] is not None:
+        ax.axhline(limit[0], color="red")
+        ax.axhline(limit[1], color="red")
+
+    ax.set_title(title)
+    ax.grid(True)
+    return fig
+
+def download(fig, name):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    buf.seek(0)
+    st.download_button("📥 Download PNG", buf, name, "image/png")
+
 # =========================
-# PREP SPC DATA
+# PREP DATA
 # =========================
 spc = {
     "ΔL": {
@@ -150,38 +184,42 @@ spc = {
 # =========================
 # MAIN
 # =========================
-st.title(f"🎨 SPC Color Dashboard – {color}")
+st.title(f"🎨 SPC Color Dashboard — {color}")
 
-# === COMBINED FIRST ===
-st.subheader("📊 COMBINED SPC")
-
-for k in ["ΔL", "Δa", "Δb"]:
-    lab_l = get_limit(color, k, "LAB")
-    line_l = get_limit(color, k, "LINE")
-
-    fig = spc_chart(
+st.markdown("### 📊 COMBINED SPC")
+for k in spc:
+    fig = spc_combined(
         spc[k]["lab"],
         spc[k]["line"],
         f"COMBINED {k}",
-        lab_l,
-        line_l
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
 
-# === INDIVIDUAL ===
-for k in ["ΔL", "Δa", "Δb"]:
-    st.subheader(f"📈 SPC {k}")
-
-    lab_l = get_limit(color, k, "LAB")
-    line_l = get_limit(color, k, "LINE")
-
-    fig = spc_chart(
+st.markdown("### 🧪 LAB SPC")
+for k in spc:
+    fig = spc_single(
         spc[k]["lab"],
-        spc[k]["line"],
-        f"{k} SPC",
-        lab_l,
-        line_l
+        f"LAB {k}",
+        get_limit(color, k, "LAB"),
+        "#1f77b4"
     )
     st.pyplot(fig)
+    download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🏭 LINE SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["line"],
+        f"LINE {k}",
+        get_limit(color, k, "LINE"),
+        "#2ca02c"
+    )
+    st.pyplot(fig)
+    download(fig, f"LINE_{color}_{k}.png")
