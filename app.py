@@ -1,18 +1,15 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # ===============================
-# 1. PAGE CONFIG
+# PAGE CONFIG
 # ===============================
-st.set_page_config(
-    page_title="SPC Dashboard – Data Viewer",
-    layout="wide"
-)
-
-st.title("SPC – Google Sheets Data Viewer")
+st.set_page_config(page_title="SPC Dashboard", layout="wide")
+st.title("SPC Dashboard – ΔL / Δa / Δb (LAB vs LINE)")
 
 # ===============================
-# 2. GOOGLE SHEET CSV URL
+# GOOGLE SHEET CSV
 # ===============================
 url = (
     "https://docs.google.com/spreadsheets/d/"
@@ -21,12 +18,12 @@ url = (
 )
 
 # ===============================
-# 3. LOAD DATA
+# LOAD DATA
 # ===============================
 df = pd.read_csv(url)
 
 # ===============================
-# 4. NORMALIZE COLUMN NAMES
+# NORMALIZE & RENAME COLUMNS
 # ===============================
 df.columns = (
     df.columns
@@ -35,70 +32,80 @@ df.columns = (
     .str.strip()
 )
 
-# ===============================
-# 5. RENAME COLUMNS (SPC STANDARD)
-# ===============================
 COLUMN_MAP = {
-    "製造批號": "Batch",
-    "Coil No.": "Coil",
-    "Time": "Time",
+    "製造批號": "batch",
 
-    "正-北 ΔE": "ΔE_N",
-    "正-南 ΔE": "ΔE_S",
-    "Average value ΔE 正面": "ΔE_avg",
+    "Average value ΔL 正面": "dL_avg",
+    "Average value Δa 正面": "da_avg",
+    "Average value Δb 正面": "db_avg",
 
-    "正-北 ΔL": "ΔL_N",
-    "正-南 ΔL": "ΔL_S",
-    "Average value ΔL 正面": "ΔL_avg",
-
-    "正-北 Δa": "Δa_N",
-    "正-南 Δa": "Δa_S",
-    "Average value Δa 正面": "Δa_avg",
-
-    "正-北 Δb": "Δb_N",
-    "正-南 Δb": "Δb_S",
-    "Average value Δb 正面": "Δb_avg",
-
-    "入料檢測 ΔE 正面": "ΔE_input",
-    "入料檢測 ΔL 正面": "ΔL_input",
-    "入料檢測 Δa 正面": "Δa_input",
-    "入料檢測 Δb 正面": "Δb_input",
+    "入料檢測 ΔL 正面": "dL_input",
+    "入料檢測 Δa 正面": "da_input",
+    "入料檢測 Δb 正面": "db_input",
 }
 
 df = df.rename(columns=COLUMN_MAP)
 
-st.success("Google Sheets data loaded and normalized successfully.")
+st.success("Data loaded successfully.")
 
 # ===============================
-# 6. DATA SUMMARY
+# LINE AVERAGE PER BATCH
 # ===============================
-st.subheader("Data summary")
-st.write("Total rows:", len(df))
-st.write("Total columns:", len(df.columns))
-
-# ===============================
-# 7. FINAL COLUMN NAMES
-# ===============================
-st.subheader("Final column names (SPC ready)")
-st.write(df.columns.tolist())
-
-# ===============================
-# 8. FULL DATA VIEW
-# ===============================
-st.subheader("Full dataset")
-st.dataframe(
-    df,
-    use_container_width=True,
-    height=800
+line_batch = (
+    df.groupby("batch")[["dL_avg", "da_avg", "db_avg"]]
+    .mean()
+    .reset_index()
 )
 
 # ===============================
-# 9. DOWNLOAD CSV
+# LAB INPUT PER BATCH
 # ===============================
-st.download_button(
-    label="Download full dataset (CSV)",
-    data=df.to_csv(index=False),
-    file_name="spc_full_data.csv",
-    mime="text/csv"
+lab_batch = (
+    df.groupby("batch")[["dL_input", "da_input", "db_input"]]
+    .first()
+    .reset_index()
 )
 
+# ===============================
+# SPC FUNCTION
+# ===============================
+def spc_chart(df, y_col, title, ylabel):
+    y = df[y_col].dropna()
+
+    mean = y.mean()
+    std = y.std()
+
+    ucl = mean + 3 * std
+    lcl = mean - 3 * std
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(df["batch"], df[y_col], marker="o")
+    ax.axhline(mean, linestyle="--", label="CL")
+    ax.axhline(ucl, linestyle="--", label="UCL")
+    ax.axhline(lcl, linestyle="--", label="LCL")
+
+    ax.set_title(title)
+    ax.set_xlabel("Batch")
+    ax.set_ylabel(ylabel)
+    ax.legend()
+
+    st.pyplot(fig)
+
+# ===============================
+# SPC CHARTS
+# ===============================
+st.header("SPC Charts")
+
+tabs = st.tabs(["ΔL", "Δa", "Δb"])
+
+with tabs[0]:
+    spc_chart(line_batch, "dL_avg", "SPC ΔL – LINE", "ΔL")
+    spc_chart(lab_batch, "dL_input", "SPC ΔL – LAB", "ΔL")
+
+with tabs[1]:
+    spc_chart(line_batch, "da_avg", "SPC Δa – LINE", "Δa")
+    spc_chart(lab_batch, "da_input", "SPC Δa – LAB", "Δa")
+
+with tabs[2]:
+    spc_chart(line_batch, "db_avg", "SPC Δb – LINE", "Δb")
+    spc_chart(lab_batch, "db_input", "SPC Δb – LAB", "Δb")
