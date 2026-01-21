@@ -33,17 +33,25 @@ def load_limit():
 
 df = load_data()
 
-# 🔴 FIX BẮT BUỘC – CHUẨN HÓA TÊN CỘT (TRÁNH KEYERROR)
+# 🔴 CHUẨN HÓA HEADER
 df.columns = (
     df.columns
       .str.replace("\r\n", " ", regex=False)
       .str.replace("\n", " ", regex=False)
-      .str.replace("　", " ", regex=False)   # full-width space
+      .str.replace("　", " ", regex=False)
       .str.replace(r"\s+", " ", regex=True)
       .str.strip()
 )
 
 limit_df = load_limit()
+limit_df.columns = (
+    limit_df.columns
+      .str.replace("\r\n", " ", regex=False)
+      .str.replace("\n", " ", regex=False)
+      .str.replace("　", " ", regex=False)
+      .str.replace(r"\s+", " ", regex=True)
+      .str.strip()
+)
 
 # =========================
 # SIDEBAR – FILTER
@@ -123,49 +131,67 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS
+# SPC CHARTS (ĐẸP)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(13, 4))
 
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["Time"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["Time"], line["value"], "o-", label="LINE", color="#2ca02c")
+    ax.plot(
+        lab["Time"], lab["value"],
+        marker="o", linewidth=1.5, markersize=5,
+        label="LAB", color="#1f77b4"
+    )
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+    ax.plot(
+        line["Time"], line["value"],
+        marker="s", linewidth=1.5, markersize=5,
+        label="LINE", color="#2ca02c"
+    )
+
+    ax.axhline(mean, color="black", linestyle="--", linewidth=1, label="Mean")
+    ax.axhline(mean + 3*std, color="orange", linestyle="--", alpha=0.6)
+    ax.axhline(mean - 3*std, color="orange", linestyle="--", alpha=0.6)
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", linewidth=2)
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", linewidth=2)
 
     if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red")
-        ax.axhline(line_lim[1], color="red")
+        ax.axhline(line_lim[0], color="red", linewidth=2)
+        ax.axhline(line_lim[1], color="red", linewidth=2)
 
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.grid(True, linestyle="--", alpha=0.3)
+    ax.legend(ncol=5, fontsize=9)
+    fig.tight_layout()
     return fig
 
 def spc_single(spc, title, limit, color):
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(13, 4))
 
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(spc["Time"], spc["value"], "o-", color=color)
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+    ax.plot(
+        spc["Time"], spc["value"],
+        marker="o", linewidth=1.5, markersize=5,
+        color=color
+    )
+
+    ax.axhline(mean, color="black", linestyle="--", linewidth=1)
+    ax.axhline(mean + 3*std, color="orange", linestyle="--", alpha=0.6)
+    ax.axhline(mean - 3*std, color="orange", linestyle="--", alpha=0.6)
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red")
-        ax.axhline(limit[1], color="red")
+        ax.axhline(limit[0], color="red", linewidth=2)
+        ax.axhline(limit[1], color="red", linewidth=2)
 
-    ax.set_title(title)
-    ax.grid(True)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.grid(True, linestyle="--", alpha=0.3)
+    fig.tight_layout()
     return fig
 
 def download(fig, name):
