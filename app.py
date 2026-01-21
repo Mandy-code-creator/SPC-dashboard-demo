@@ -33,10 +33,10 @@ def load_limit():
 
 df = load_data()
 
-# 🔴 FIX BẮT BUỘC – CHUẨN HÓA TÊN CỘT (NGUYÊN NHÂN KEYERROR)
+# 🔴 FIX BẮT BUỘC – CHUẨN HÓA TÊN CỘT (TRÁNH KEYERROR)
 df.columns = (
     df.columns
-      .str.replace("\r\n", "\n", regex=False)
+      .str.replace("\r\n", " ", regex=False)
       .str.replace("\n", " ", regex=False)
       .str.replace("　", " ", regex=False)   # full-width space
       .str.replace(r"\s+", " ", regex=True)
@@ -199,4 +199,38 @@ st.title(f"🎨 SPC Color Dashboard — {color}")
 
 st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    fig = spc_com_
+    fig = spc_combined(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
+    )
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🧪 LAB SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["lab"],
+        f"LAB {k}",
+        get_limit(color, k, "LAB"),
+        "#1f77b4"
+    )
+    st.pyplot(fig)
+    download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🏭 LINE SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["line"],
+        f"LINE {k}",
+        get_limit(color, k, "LINE"),
+        "#2ca02c"
+    )
+    st.pyplot(fig)
+    download(fig, f"LINE_{color}_{k}.png")
