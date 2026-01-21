@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import io
+import numpy as np
+from scipy.stats import norm
 
 # =========================
 # PAGE CONFIG
@@ -91,7 +93,7 @@ if month:
 st.sidebar.divider()
 
 # =========================
-# LIMIT DISPLAY (FIX 2 DECIMALS)
+# LIMIT DISPLAY (2 DECIMALS)
 # =========================
 def show_limits(factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -102,22 +104,16 @@ def show_limits(factor):
     st.sidebar.markdown(f"**{factor} Control Limits**")
 
     table = row.filter(like=factor).copy()
-
-    # 🔴 ÉP HIỂN THỊ 2 CHỮ SỐ THẬP PHÂN
     for c in table.columns:
         table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
-    st.sidebar.dataframe(
-        table,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
 
 show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# LIMIT FUNCTION (LOGIC GỐC)
+# LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -228,6 +224,57 @@ def spc_single(spc, title, limit, color):
 
     return fig
 
+def spc_distribution(spc, title, limit, color):
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    values = spc["value"].dropna()
+    mean = values.mean()
+    std = values.std()
+
+    lcl, ucl = limit
+    center = (ucl + lcl) / 2 if lcl is not None else None
+
+    bins = np.histogram_bin_edges(values, bins=12)
+    counts, _, patches = ax.hist(values, bins=bins, edgecolor="white")
+
+    for patch, left, right in zip(patches, bins[:-1], bins[1:]):
+        c = (left + right) / 2
+        patch.set_facecolor("red" if lcl is not None and (c < lcl or c > ucl) else color)
+        patch.set_alpha(0.75)
+
+    x = np.linspace(values.min(), values.max(), 200)
+    pdf = norm.pdf(x, mean, std)
+    scale = len(values) * (bins[1] - bins[0])
+    ax.plot(x, pdf * scale, color="black", linewidth=2, label="Normal Curve")
+
+    ax.axvline(mean, color="blue", linestyle="--", label="Mean")
+
+    if lcl is not None:
+        ax.axvline(lcl, color="red", label="LCL")
+        ax.axvline(ucl, color="red", label="UCL")
+
+        cp = (ucl - lcl) / (6 * std) if std > 0 else 0
+        cpk = min(ucl - mean, mean - lcl) / (3 * std) if std > 0 else 0
+        ca = abs(mean - center) / ((ucl - lcl) / 2) if std > 0 else 0
+
+        ax.text(
+            0.98, 0.95,
+            f"Cp  = {cp:.2f}\nCpk = {cpk:.2f}\nCa  = {ca:.2f}",
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=10,
+            bbox=dict(boxstyle="round", fc="#f6f8fa", ec="gray")
+        )
+
+    ax.set_title(title)
+    ax.set_xlabel("Value")
+    ax.set_ylabel("Frequency")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+
+    return fig
+
 def download(fig, name):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
@@ -270,7 +317,6 @@ for k in spc:
     download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
-
 st.markdown("### 🧪 LAB SPC")
 for k in spc:
     fig = spc_single(
@@ -283,7 +329,6 @@ for k in spc:
     download(fig, f"LAB_{color}_{k}.png")
 
 st.markdown("---")
-
 st.markdown("### 🏭 LINE SPC")
 for k in spc:
     fig = spc_single(
@@ -294,3 +339,15 @@ for k in spc:
     )
     st.pyplot(fig)
     download(fig, f"LINE_{color}_{k}.png")
+
+st.markdown("---")
+st.markdown("### 📈 SPC Distribution (Cp / Cpk / Ca)")
+for k in spc:
+    fig = spc_distribution(
+        spc[k]["line"],
+        f"Distribution {k}",
+        get_limit(color, k, "LINE"),
+        "#6f42c1"
+    )
+    st.pyplot(fig)
+    download(fig, f"DIST_{color}_{k}.png")
