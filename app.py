@@ -39,30 +39,30 @@ df.columns = (
 # 5. RENAME COLUMNS (SPC STANDARD)
 # ===============================
 COLUMN_MAP = {
-    "製造批號": "batch",
-    "Coil No.": "coil",
-    "Time": "time",
+    "製造批號": "Batch",
+    "Coil No.": "Coil",
+    "Time": "Time",
 
-    "正-北 ΔE": "dE_N",
-    "正-南 ΔE": "dE_S",
-    "Average value ΔE 正面": "dE_avg",
+    "正-北 ΔE": "ΔE_N",
+    "正-南 ΔE": "ΔE_S",
+    "Average value ΔE 正面": "ΔE_avg",
 
-    "正-北 ΔL": "dL_N",
-    "正-南 ΔL": "dL_S",
-    "Average value ΔL 正面": "dL_avg",
+    "正-北 ΔL": "ΔL_N",
+    "正-南 ΔL": "ΔL_S",
+    "Average value ΔL 正面": "ΔL_avg",
 
-    "正-北 Δa": "da_N",
-    "正-南 Δa": "da_S",
-    "Average value Δa 正面": "da_avg",
+    "正-北 Δa": "Δa_N",
+    "正-南 Δa": "Δa_S",
+    "Average value Δa 正面": "Δa_avg",
 
-    "正-北 Δb": "db_N",
-    "正-南 Δb": "db_S",
-    "Average value Δb 正面": "db_avg",
+    "正-北 Δb": "Δb_N",
+    "正-南 Δb": "Δb_S",
+    "Average value Δb 正面": "Δb_avg",
 
-    "入料檢測 ΔE 正面": "dE_input",
-    "入料檢測 ΔL 正面": "dL_input",
-    "入料檢測 Δa 正面": "da_input",
-    "入料檢測 Δb 正面": "db_input",
+    "入料檢測 ΔE 正面": "ΔE_input",
+    "入料檢測 ΔL 正面": "ΔL_input",
+    "入料檢測 Δa 正面": "Δa_input",
+    "入料檢測 Δb 正面": "Δb_input",
 }
 
 df = df.rename(columns=COLUMN_MAP)
@@ -101,3 +101,4 @@ st.download_button(
     file_name="spc_full_data.csv",
     mime="text/csv"
 )
+
