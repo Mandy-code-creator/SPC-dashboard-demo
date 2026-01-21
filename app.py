@@ -86,22 +86,32 @@ if month:
 st.sidebar.divider()
 
 # =========================
-# LIMIT DISPLAY
+# LIMIT DISPLAY (CÓ MÀU)
 # =========================
-def show_limits(factor):
+def show_limits(factor, bg_color):
     row = limit_df[limit_df["Color_code"] == color]
     if row.empty:
         st.sidebar.warning(f"No {factor} limits")
         return
-    st.sidebar.markdown(f"**{factor} Control Limits**")
-    st.sidebar.dataframe(
-        row.filter(like=factor),
-        use_container_width=True,
-        hide_index=True
+
+    styled = (
+        row.filter(like=factor)
+        .style
+        .set_properties(**{
+            "background-color": bg_color,
+            "color": "#000",
+            "border-color": "#999"
+        })
+        .set_table_styles([
+            {"selector": "th", "props": [("font-weight", "bold")]}
+        ])
     )
 
-show_limits("LAB")
-show_limits("LINE")
+    st.sidebar.markdown(f"**{factor} Control Limits**")
+    st.sidebar.dataframe(styled, use_container_width=True, hide_index=True)
+
+show_limits("LAB", "#e3f2fd")   # xanh dương nhạt
+show_limits("LINE", "#e8f5e9")  # xanh lá nhạt
 
 # =========================
 # LIMIT FUNCTION
@@ -135,7 +145,7 @@ def prep_lab(df, col):
     return out.sort_values("Time")
 
 # =========================
-# SPC CHARTS (BATCH ON X)
+# SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(13, 4))
@@ -143,34 +153,24 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(
-        lab["製造批號"], lab["value"],
-        marker="o", linewidth=1.5, markersize=5,
-        label="LAB", color="#1f77b4"
-    )
+    ax.plot(lab["製造批號"], lab["value"], marker="o", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], marker="s", label="LINE", color="#2ca02c")
 
-    ax.plot(
-        line["製造批號"], line["value"],
-        marker="s", linewidth=1.5, markersize=5,
-        label="LINE", color="#2ca02c"
-    )
-
-    ax.axhline(mean, color="black", linestyle="--", linewidth=1, label="Mean")
-    ax.axhline(mean + 3*std, color="orange", linestyle="--", alpha=0.6)
-    ax.axhline(mean - 3*std, color="orange", linestyle="--", alpha=0.6)
+    ax.axhline(mean, color="black", linestyle="--")
+    ax.axhline(mean + 3*std, color="orange", linestyle="--")
+    ax.axhline(mean - 3*std, color="orange", linestyle="--")
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", linewidth=2)
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", linewidth=2)
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
 
     if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", linewidth=2)
-        ax.axhline(line_lim[1], color="red", linewidth=2)
+        ax.axhline(line_lim[0], color="red")
+        ax.axhline(line_lim[1], color="red")
 
-    ax.set_title(title, fontsize=13, fontweight="bold")
-    ax.set_xlabel("Batch Code")
-    ax.grid(True, linestyle="--", alpha=0.3)
-    ax.legend(ncol=5, fontsize=9)
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
     plt.xticks(rotation=45)
     fig.tight_layout()
     return fig
@@ -181,23 +181,18 @@ def spc_single(spc, title, limit, color):
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(
-        spc["製造批號"], spc["value"],
-        marker="o", linewidth=1.5, markersize=5,
-        color=color
-    )
+    ax.plot(spc["製造批號"], spc["value"], marker="o", color=color)
 
-    ax.axhline(mean, color="black", linestyle="--", linewidth=1)
-    ax.axhline(mean + 3*std, color="orange", linestyle="--", alpha=0.6)
-    ax.axhline(mean - 3*std, color="orange", linestyle="--", alpha=0.6)
+    ax.axhline(mean, color="black", linestyle="--")
+    ax.axhline(mean + 3*std, color="orange", linestyle="--")
+    ax.axhline(mean - 3*std, color="orange", linestyle="--")
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red", linewidth=2)
-        ax.axhline(limit[1], color="red", linewidth=2)
+        ax.axhline(limit[0], color="red")
+        ax.axhline(limit[1], color="red")
 
-    ax.set_title(title, fontsize=13, fontweight="bold")
-    ax.set_xlabel("Batch Code")
-    ax.grid(True, linestyle="--", alpha=0.3)
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
     plt.xticks(rotation=45)
     fig.tight_layout()
     return fig
