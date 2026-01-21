@@ -2,208 +2,178 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from io import BytesIO
 
-st.set_page_config(page_title="SPC Color Dashboard", layout="wide")
-
-# =====================================================
-# GOOGLE SHEET LINKS
-# =====================================================
-DATA_SHEET = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534"
-    "/export?format=csv"
+# ======================
+# PAGE CONFIG
+# ======================
+st.set_page_config(
+    page_title="SPC Color Dashboard",
+    layout="wide",
+    page_icon="📊"
 )
 
-LIMIT_SHEET = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo"
-    "/export?format=csv"
-)
+# ======================
+# STYLE
+# ======================
+st.markdown("""
+<style>
+.stApp { background-color: #f7f9fc; }
+h1, h2, h3 { color: #0f172a; }
+section[data-testid="stSidebar"] { background-color: #0f172a; }
+section[data-testid="stSidebar"] * { color: white; }
+.metric-box {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+</style>
+""", unsafe_allow_html=True)
 
-# =====================================================
-# LOAD DATA
-# =====================================================
+# ======================
+# LOAD GOOGLE SHEET
+# ======================
 @st.cache_data
-def load_data():
-    df = pd.read_csv(DATA_SHEET)
+def load_sheet(url):
+    csv_url = url.replace("/edit?gid=", "/export?format=csv&gid=")
+    df = pd.read_csv(csv_url)
+    # normalize column names
     df.columns = (
         df.columns
         .str.replace("\n", " ", regex=False)
         .str.replace("  ", " ", regex=False)
         .str.strip()
     )
-    df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
     return df
 
+DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/edit?gid=0"
+LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/edit?gid=0"
 
-@st.cache_data
-def load_limits():
-    df = pd.read_csv(LIMIT_SHEET)
-    df.columns = df.columns.str.strip()
-    return df
+df = load_sheet(DATA_URL)
+limit_df = load_sheet(LIMIT_URL)
 
+st.success("✅ Data loaded successfully from Google Sheets")
 
-df = load_data()
-limit_df = load_limits()
+# ======================
+# BASIC CLEAN
+# ======================
+df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
+df = df.dropna(subset=["Time"])
 
-st.success("Data loaded successfully from Google Sheets")
-
-# =====================================================
-# SAFE COLUMN FINDER
-# =====================================================
-def find_col(keywords):
-    for c in df.columns:
-        if all(k in c for k in keywords):
-            return c
-    return None
-
-
-# =====================================================
-# MAP DATA (100% SAFE)
-# =====================================================
-df["dL_lab"] = df[find_col(["入料檢測", "ΔL"])]
-df["da_lab"] = df[find_col(["入料檢測", "Δa"])]
-df["db_lab"] = df[find_col(["入料檢測", "Δb"])]
-
-df["dL_line"] = df[
-    [
-        find_col(["正-北", "ΔL"]),
-        find_col(["正-南", "ΔL"])
-    ]
-].mean(axis=1)
-
-df["da_line"] = df[
-    [
-        find_col(["正-北", "Δa"]),
-        find_col(["正-南", "Δa"])
-    ]
-].mean(axis=1)
-
-df["db_line"] = df[
-    [
-        find_col(["正-北", "Δb"]),
-        find_col(["正-南", "Δb"])
-    ]
-].mean(axis=1)
-
-# =====================================================
-# TIME
-# =====================================================
 df["Year"] = df["Time"].dt.year
 df["Month"] = df["Time"].dt.month
 
-# =====================================================
-# SIDEBAR – TIME FILTER
-# =====================================================
-st.sidebar.header("⏱ Time Filter")
+# ======================
+# CALCULATED COLUMNS
+# ======================
+df["dL_line"] = df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+df["da_line"] = df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+df["db_line"] = df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
-years = sorted(df["Year"].dropna().unique().astype(int))
-latest_year = max(years)
+df["dL_lab"] = df["入料檢測 ΔL 正面"]
+df["da_lab"] = df["入料檢測 Δa 正面"]
+df["db_lab"] = df["入料檢測 Δb 正面"]
 
-year_sel = st.sidebar.selectbox(
+# ======================
+# SIDEBAR FILTER
+# ======================
+st.sidebar.markdown("## ⏱ Time Filter")
+
+latest_year = int(df["Year"].max())
+year = st.sidebar.selectbox(
     "Year",
-    ["All"] + years,
-    index=years.index(latest_year) + 1
+    sorted(df["Year"].unique()),
+    index=sorted(df["Year"].unique()).index(latest_year)
 )
 
-month_sel = st.sidebar.selectbox(
+month = st.sidebar.multiselect(
     "Month",
-    ["All"] + list(range(1, 13))
+    sorted(df["Month"].unique())
 )
 
-if year_sel != "All":
-    df = df[df["Year"] == year_sel]
+df_f = df[df["Year"] == year]
+if month:
+    df_f = df_f[df_f["Month"].isin(month)]
 
-if month_sel != "All":
-    df = df[df["Month"] == month_sel]
+# ======================
+# COLOR CODE FILTER
+# ======================
+st.sidebar.markdown("## 🎨 Color Code")
 
-# =====================================================
-# SIDEBAR – COLOR CODE
-# =====================================================
-st.sidebar.header("🎨 Color Code")
+color_codes = df_f["塗料編號"].dropna().unique()
+color = st.sidebar.selectbox("Select Color Code", color_codes)
+df_f = df_f[df_f["塗料編號"] == color]
 
-color_codes = df["塗料編號"].dropna().unique()
-color_sel = st.sidebar.selectbox("Color Code", color_codes)
-
-df = df[df["塗料編號"] == color_sel]
-
-# =====================================================
-# CONTROL LIMITS
-# =====================================================
-def get_limit(color, col):
+# ======================
+# CONTROL LIMIT LOOKUP
+# ======================
+def get_limit(color, name):
     row = limit_df[limit_df["Color_code"] == color]
-    if row.empty or col not in row.columns:
-        return None
-    return row[col].values[0]
+    if row.empty:
+        return None, None
+    lcl = row[f"{name} LCL"].values[0]
+    ucl = row[f"{name} UCL"].values[0]
+    return lcl, ucl
 
-
-limits = {
-    "dL": (get_limit(color_sel, "ΔL LCL"), get_limit(color_sel, "ΔL UCL")),
-    "da": (get_limit(color_sel, "Δa LCL"), get_limit(color_sel, "Δa UCL")),
-    "db": (get_limit(color_sel, "Δb LCL"), get_limit(color_sel, "Δb UCL")),
+lab_limits = {
+    "dL": get_limit(color, "ΔL"),
+    "da": get_limit(color, "Δa"),
+    "db": get_limit(color, "Δb"),
 }
 
-# =====================================================
-# SPC CHART FUNCTION
-# =====================================================
-def spc_chart(data, col, title, lcl, ucl):
-    fig, ax = plt.subplots(figsize=(11, 4))
+line_limits = lab_limits  # same sheet, separated logically
 
-    y = data[col].dropna().values
-    mean = np.mean(y)
-    std = np.std(y)
+# ======================
+# SPC FUNCTION
+# ======================
+def spc_chart(data, y, title, lcl_int, ucl_int):
+    mean = data[y].mean()
+    std = data[y].std()
+    ucl_3s = mean + 3 * std
+    lcl_3s = mean - 3 * std
 
-    for i, v in enumerate(y):
-        if lcl is not None and ucl is not None and (v < lcl or v > ucl):
+    fig, ax = plt.subplots(figsize=(12,4))
+
+    for i, v in enumerate(data[y]):
+        if lcl_int is not None and (v < lcl_int or v > ucl_int):
             ax.scatter(i, v, color="red")
-        elif abs(v - mean) > 3 * std:
+        elif v < lcl_3s or v > ucl_3s:
             ax.scatter(i, v, color="orange")
         else:
             ax.scatter(i, v, color="black")
 
-    ax.plot(y, alpha=0.4)
-    ax.axhline(mean, color="blue", linestyle="--", label="Mean")
-    ax.axhline(mean + 3 * std, color="orange", linestyle=":")
-    ax.axhline(mean - 3 * std, color="orange", linestyle=":")
+    ax.plot(data[y].values, linewidth=0.5)
+    ax.axhline(mean, linestyle="--", color="blue", label="Mean")
+    ax.axhline(ucl_3s, linestyle="--", color="orange", label="±3σ")
+    ax.axhline(lcl_3s, linestyle="--", color="orange")
 
-    if lcl is not None and ucl is not None:
-        ax.axhline(lcl, color="red", label="LCL")
-        ax.axhline(ucl, color="red", label="UCL")
+    if lcl_int is not None:
+        ax.axhline(ucl_int, linestyle="--", color="purple", label="Internal Spec")
+        ax.axhline(lcl_int, linestyle="--", color="purple")
 
     ax.set_title(title)
     ax.legend()
     return fig
 
-
-# =====================================================
+# ======================
 # DASHBOARD
-# =====================================================
-st.title("🎨 SPC Color Control Dashboard")
+# ======================
+st.title("📊 SPC Color Control Dashboard")
 
-# ---- COMBINED FIRST ----
-st.subheader("📌 COMBINED SPC – LINE Priority")
+st.markdown("### 📌 COMBINED SPC – LAB & LINE")
 
-st.pyplot(
-    spc_chart(
-        df,
-        "dL_line",
-        "COMBINED ΔL",
-        limits["dL"][0],
-        limits["dL"][1],
-    )
-)
+fig = spc_chart(df_f, "dL_line", "COMBINED ΔL", *lab_limits["dL"])
+st.pyplot(fig)
 
-st.markdown("---")
-
-# ---- DETAIL ----
-tabs = st.tabs(["LAB SPC", "LINE SPC"])
+tabs = st.tabs(["🧪 LAB SPC", "🏭 LINE SPC"])
 
 with tabs[0]:
-    st.pyplot(spc_chart(df, "dL_lab", "LAB ΔL", *limits["dL"]))
-    st.pyplot(spc_chart(df, "da_lab", "LAB Δa", *limits["da"]))
-    st.pyplot(spc_chart(df, "db_lab", "LAB Δb", *limits["db"]))
+    st.pyplot(spc_chart(df_f, "dL_lab", "LAB ΔL", *lab_limits["dL"]))
+    st.pyplot(spc_chart(df_f, "da_lab", "LAB Δa", *lab_limits["da"]))
+    st.pyplot(spc_chart(df_f, "db_lab", "LAB Δb", *lab_limits["db"]))
 
 with tabs[1]:
-    st.pyplot(spc_chart(df, "dL_line", "LINE ΔL", *limits["dL"]))
-    st.pyplot(spc_chart(df, "da_line", "LINE Δa", *limits["da"]))
-    st.pyplot(spc_chart(df, "db_line", "LINE Δb", *limits["db"]))
+    st.pyplot(spc_chart(df_f, "dL_line", "LINE ΔL", *line_limits["dL"]))
+    st.pyplot(spc_chart(df_f, "da_line", "LINE Δa", *line_limits["da"]))
+    st.pyplot(spc_chart(df_f, "db_line", "LINE Δb", *line_limits["db"]))
