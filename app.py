@@ -138,10 +138,37 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC TIME CHARTS (GIỮ NGUYÊN)
+# SPC CHARTS (GIỮ NGUYÊN)
 # =========================
+def spc_combined(lab, line, title, lab_lim, line_lim):
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    mean = line["value"].mean()
+    std = line["value"].std()
+
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
+
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red")
+        ax.axhline(line_lim[1], color="red")
+
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    return fig
+
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
+
     mean = spc["value"].mean()
     std = spc["value"].std()
 
@@ -158,82 +185,109 @@ def spc_single(spc, title, limit, color):
     ax.tick_params(axis="x", rotation=45)
     return fig
 
-# =========================
-# NORMAL PDF
-# =========================
-def normal_pdf(x, mean, std):
-    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
-
-# =========================
-# DISTRIBUTION CHART
-# =========================
-def spc_distribution(spc, title, limit, color):
-    fig, ax = plt.subplots(figsize=(8, 4))
-    values = spc["value"].dropna()
-    mean = values.mean()
-    std = values.std()
-    lcl, ucl = limit
-    center = (ucl + lcl) / 2 if lcl is not None else None
-
-    bins = np.histogram_bin_edges(values, bins=12)
-    _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
-
-    for p, l, r in zip(patches, bins[:-1], bins[1:]):
-        c = (l + r) / 2
-        p.set_facecolor("red" if lcl and (c < lcl or c > ucl) else color)
-        p.set_alpha(0.75)
-
-    x = np.linspace(values.min(), values.max(), 200)
-    pdf = normal_pdf(x, mean, std)
-    scale = len(values) * (bins[1] - bins[0])
-    ax.plot(x, pdf * scale, color="black")
-
-    if lcl:
-        cp = (ucl - lcl) / (6 * std)
-        cpk = min(ucl - mean, mean - lcl) / (3 * std)
-        ca = abs(mean - center) / ((ucl - lcl) / 2)
-        ax.text(
-            0.98, 0.95,
-            f"Cp={cp:.2f}\nCpk={cpk:.2f}\nCa={ca:.2f}",
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            bbox=dict(boxstyle="round", fc="#f6f8fa")
-        )
-
-    ax.set_title(title)
-    ax.grid(axis="y", alpha=0.3)
-    return fig
+def download(fig, name):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    buf.seek(0)
+    st.download_button("📥 Download PNG", buf, name, "image/png")
 
 # =========================
 # PREP DATA
 # =========================
 spc = {
-    "ΔL": prep_spc(df, "正-北 ΔL", "正-南 ΔL"),
-    "Δa": prep_spc(df, "正-北 Δa", "正-南 Δa"),
-    "Δb": prep_spc(df, "正-北 Δb", "正-南 Δb")
+    "ΔL": {
+        "lab": prep_lab(df, "入料檢測 ΔL 正面"),
+        "line": prep_spc(df, "正-北 ΔL", "正-南 ΔL")
+    },
+    "Δa": {
+        "lab": prep_lab(df, "入料檢測 Δa 正面"),
+        "line": prep_spc(df, "正-北 Δa", "正-南 Δa")
+    },
+    "Δb": {
+        "lab": prep_lab(df, "入料檢測 Δb 正面"),
+        "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
+    }
 }
 
 # =========================
-# MAIN – CẢ HAI BIỂU ĐỒ
+# MAIN – BIỂU ĐỒ GỐC (GIỮ NGUYÊN)
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
-st.markdown("## 🏭 LINE SPC (Time Series)")
+st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    st.pyplot(spc_single(
-        spc[k],
+    fig = spc_combined(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
+    )
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🧪 LAB SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["lab"],
+        f"LAB {k}",
+        get_limit(color, k, "LAB"),
+        "#1f77b4"
+    )
+    st.pyplot(fig)
+    download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🏭 LINE SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["line"],
         f"LINE {k}",
         get_limit(color, k, "LINE"),
         "#2ca02c"
-    ))
+    )
+    st.pyplot(fig)
+    download(fig, f"LINE_{color}_{k}.png")
 
+# =========================
+# DASHBOARD NHỎ – DISTRIBUTION
+# =========================
 st.markdown("---")
-st.markdown("## 📈 SPC Distribution (Cp / Cpk / Ca)")
-for k in spc:
-    st.pyplot(spc_distribution(
-        spc[k],
-        f"Distribution {k}",
-        get_limit(color, k, "LINE"),
-        "#6f42c1"
-    ))
+st.markdown("## 📈 Process Distribution Dashboard")
+
+def normal_pdf(x, mean, std):
+    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
+
+cols = st.columns(3)
+
+for i, k in enumerate(spc):
+    with cols[i]:
+        values = spc[k]["line"]["value"].dropna()
+        mean = values.mean()
+        std = values.std()
+        lcl, ucl = get_limit(color, k, "LINE")
+        center = (ucl + lcl) / 2 if lcl is not None else None
+
+        fig, ax = plt.subplots(figsize=(4, 3))
+        bins = np.histogram_bin_edges(values, bins=10)
+        _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
+
+        for p, l, r in zip(patches, bins[:-1], bins[1:]):
+            c = (l + r) / 2
+            p.set_facecolor("red" if lcl and (c < lcl or c > ucl) else "#6f42c1")
+            p.set_alpha(0.8)
+
+        x = np.linspace(values.min(), values.max(), 200)
+        pdf = normal_pdf(x, mean, std)
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
+
+        cp = (ucl - lcl) / (6 * std)
+        cpk = min(ucl - mean, mean - lcl) / (3 * std)
+        ca = abs(mean - center) / ((ucl - lcl) / 2)
+
+        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
+        ax.grid(axis="y", alpha=0.3)
+        st.pyplot(fig)
