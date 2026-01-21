@@ -59,31 +59,22 @@ def find_col(keywords):
 
 
 # =====================================================
-# MAP DATA (100% SAFE)
+# MAP DATA (SAFE – KHÔNG KEYERROR)
 # =====================================================
 df["dL_lab"] = df[find_col(["入料檢測", "ΔL"])]
 df["da_lab"] = df[find_col(["入料檢測", "Δa"])]
 df["db_lab"] = df[find_col(["入料檢測", "Δb"])]
 
 df["dL_line"] = df[
-    [
-        find_col(["正-北", "ΔL"]),
-        find_col(["正-南", "ΔL"])
-    ]
+    [find_col(["正-北", "ΔL"]), find_col(["正-南", "ΔL"])]
 ].mean(axis=1)
 
 df["da_line"] = df[
-    [
-        find_col(["正-北", "Δa"]),
-        find_col(["正-南", "Δa"])
-    ]
+    [find_col(["正-北", "Δa"]), find_col(["正-南", "Δa"])]
 ].mean(axis=1)
 
 df["db_line"] = df[
-    [
-        find_col(["正-北", "Δb"]),
-        find_col(["正-南", "Δb"])
-    ]
+    [find_col(["正-北", "Δb"]), find_col(["正-南", "Δb"])]
 ].mean(axis=1)
 
 # =====================================================
@@ -128,7 +119,7 @@ color_sel = st.sidebar.selectbox("Color Code", color_codes)
 df = df[df["塗料編號"] == color_sel]
 
 # =====================================================
-# CONTROL LIMITS
+# CONTROL LIMITS (LAB & LINE TÁCH RIÊNG)
 # =====================================================
 def get_limit(color, col):
     row = limit_df[limit_df["Color_code"] == color]
@@ -137,16 +128,27 @@ def get_limit(color, col):
     return row[col].values[0]
 
 
-limits = {
+lab_limits = {
     "dL": (get_limit(color_sel, "ΔL LCL"), get_limit(color_sel, "ΔL UCL")),
     "da": (get_limit(color_sel, "Δa LCL"), get_limit(color_sel, "Δa UCL")),
     "db": (get_limit(color_sel, "Δb LCL"), get_limit(color_sel, "Δb UCL")),
 }
 
+# hiện tại LINE dùng chung sheet 2
+line_limits = lab_limits
+
 # =====================================================
-# SPC CHART FUNCTION
+# SPC CHART FUNCTION (2 BỘ LIMIT)
 # =====================================================
-def spc_chart(data, col, title, lcl, ucl):
+def spc_chart(
+    data,
+    col,
+    title,
+    lab_lcl=None,
+    lab_ucl=None,
+    line_lcl=None,
+    line_ucl=None,
+):
     fig, ax = plt.subplots(figsize=(11, 4))
 
     y = data[col].dropna().values
@@ -154,21 +156,29 @@ def spc_chart(data, col, title, lcl, ucl):
     std = np.std(y)
 
     for i, v in enumerate(y):
-        if lcl is not None and ucl is not None and (v < lcl or v > ucl):
-            ax.scatter(i, v, color="red")
+        if lab_lcl is not None and lab_ucl is not None and (v < lab_lcl or v > lab_ucl):
+            ax.scatter(i, v, color="red", zorder=3)
         elif abs(v - mean) > 3 * std:
-            ax.scatter(i, v, color="orange")
+            ax.scatter(i, v, color="orange", zorder=3)
         else:
-            ax.scatter(i, v, color="black")
+            ax.scatter(i, v, color="black", zorder=3)
 
     ax.plot(y, alpha=0.4)
-    ax.axhline(mean, color="blue", linestyle="--", label="Mean")
-    ax.axhline(mean + 3 * std, color="orange", linestyle=":")
-    ax.axhline(mean - 3 * std, color="orange", linestyle=":")
 
-    if lcl is not None and ucl is not None:
-        ax.axhline(lcl, color="red", label="LCL")
-        ax.axhline(ucl, color="red", label="UCL")
+    # ±3σ
+    ax.axhline(mean, color="blue", linestyle="--", label="Mean")
+    ax.axhline(mean + 3 * std, color="orange", linestyle=":", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle=":", label="-3σ")
+
+    # LAB limits
+    if lab_lcl is not None and lab_ucl is not None:
+        ax.axhline(lab_lcl, color="red", linestyle="-", label="LAB LCL")
+        ax.axhline(lab_ucl, color="red", linestyle="-", label="LAB UCL")
+
+    # LINE limits
+    if line_lcl is not None and line_ucl is not None:
+        ax.axhline(line_lcl, color="purple", linestyle="--", label="LINE LCL")
+        ax.axhline(line_ucl, color="purple", linestyle="--", label="LINE UCL")
 
     ax.set_title(title)
     ax.legend()
@@ -180,30 +190,90 @@ def spc_chart(data, col, title, lcl, ucl):
 # =====================================================
 st.title("🎨 SPC Color Control Dashboard")
 
-# ---- COMBINED FIRST ----
-st.subheader("📌 COMBINED SPC – LINE Priority")
+# -----------------------------------------------------
+# COMBINED – HIỂN THỊ ĐẦU TIÊN
+# -----------------------------------------------------
+st.subheader("📌 COMBINED SPC – LAB & LINE")
 
 st.pyplot(
     spc_chart(
         df,
         "dL_line",
         "COMBINED ΔL",
-        limits["dL"][0],
-        limits["dL"][1],
+        lab_limits["dL"][0],
+        lab_limits["dL"][1],
+        line_limits["dL"][0],
+        line_limits["dL"][1],
     )
 )
 
 st.markdown("---")
 
-# ---- DETAIL ----
+# -----------------------------------------------------
+# DETAIL TABS
+# -----------------------------------------------------
 tabs = st.tabs(["LAB SPC", "LINE SPC"])
 
 with tabs[0]:
-    st.pyplot(spc_chart(df, "dL_lab", "LAB ΔL", *limits["dL"]))
-    st.pyplot(spc_chart(df, "da_lab", "LAB Δa", *limits["da"]))
-    st.pyplot(spc_chart(df, "db_lab", "LAB Δb", *limits["db"]))
+    st.pyplot(
+        spc_chart(
+            df,
+            "dL_lab",
+            "LAB ΔL",
+            lab_limits["dL"][0],
+            lab_limits["dL"][1],
+        )
+    )
+    st.pyplot(
+        spc_chart(
+            df,
+            "da_lab",
+            "LAB Δa",
+            lab_limits["da"][0],
+            lab_limits["da"][1],
+        )
+    )
+    st.pyplot(
+        spc_chart(
+            df,
+            "db_lab",
+            "LAB Δb",
+            lab_limits["db"][0],
+            lab_limits["db"][1],
+        )
+    )
 
 with tabs[1]:
-    st.pyplot(spc_chart(df, "dL_line", "LINE ΔL", *limits["dL"]))
-    st.pyplot(spc_chart(df, "da_line", "LINE Δa", *limits["da"]))
-    st.pyplot(spc_chart(df, "db_line", "LINE Δb", *limits["db"]))
+    st.pyplot(
+        spc_chart(
+            df,
+            "dL_line",
+            "LINE ΔL",
+            None,
+            None,
+            line_limits["dL"][0],
+            line_limits["dL"][1],
+        )
+    )
+    st.pyplot(
+        spc_chart(
+            df,
+            "da_line",
+            "LINE Δa",
+            None,
+            None,
+            line_limits["da"][0],
+            line_limits["da"][1],
+        )
+    )
+    st.pyplot(
+        spc_chart(
+            df,
+            "db_line",
+            "LINE Δb",
+            None,
+            None,
+            line_limits["db"][0],
+            line_limits["db"][1],
+        )
+    )
