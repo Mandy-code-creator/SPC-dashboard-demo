@@ -26,7 +26,12 @@ LIMIT_SHEET = (
 @st.cache_data
 def load_data():
     df = pd.read_csv(DATA_SHEET)
-    df.columns = df.columns.str.replace("\n", " ").str.strip()
+    df.columns = (
+        df.columns
+        .str.replace("\n", " ", regex=False)
+        .str.replace("  ", " ", regex=False)
+        .str.strip()
+    )
     df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
     return df
 
@@ -44,19 +49,46 @@ limit_df = load_limits()
 st.success("Data loaded successfully from Google Sheets")
 
 # =====================================================
-# PREPARE DATA
+# SAFE COLUMN FINDER
 # =====================================================
-# LAB (Input)
-df["dL_lab"] = df["入料檢測 ΔL 正面"]
-df["da_lab"] = df["入料檢測 Δa 正面"]
-df["db_lab"] = df["入料檢測 Δb 正面"]
+def find_col(keywords):
+    for c in df.columns:
+        if all(k in c for k in keywords):
+            return c
+    return None
 
-# LINE (Average North + South)
-df["dL_line"] = df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
-df["da_line"] = df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
-df["db_line"] = df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
-# Time
+# =====================================================
+# MAP DATA (100% SAFE)
+# =====================================================
+df["dL_lab"] = df[find_col(["入料檢測", "ΔL"])]
+df["da_lab"] = df[find_col(["入料檢測", "Δa"])]
+df["db_lab"] = df[find_col(["入料檢測", "Δb"])]
+
+df["dL_line"] = df[
+    [
+        find_col(["正-北", "ΔL"]),
+        find_col(["正-南", "ΔL"])
+    ]
+].mean(axis=1)
+
+df["da_line"] = df[
+    [
+        find_col(["正-北", "Δa"]),
+        find_col(["正-南", "Δa"])
+    ]
+].mean(axis=1)
+
+df["db_line"] = df[
+    [
+        find_col(["正-北", "Δb"]),
+        find_col(["正-南", "Δb"])
+    ]
+].mean(axis=1)
+
+# =====================================================
+# TIME
+# =====================================================
 df["Year"] = df["Time"].dt.year
 df["Month"] = df["Time"].dt.month
 
@@ -88,13 +120,15 @@ if month_sel != "All":
 # =====================================================
 # SIDEBAR – COLOR CODE
 # =====================================================
-st.sidebar.header("🎨 Color Filter")
+st.sidebar.header("🎨 Color Code")
+
 color_codes = df["塗料編號"].dropna().unique()
 color_sel = st.sidebar.selectbox("Color Code", color_codes)
+
 df = df[df["塗料編號"] == color_sel]
 
 # =====================================================
-# GET LIMITS SAFELY
+# CONTROL LIMITS
 # =====================================================
 def get_limit(color, col):
     row = limit_df[limit_df["Color_code"] == color]
@@ -103,23 +137,11 @@ def get_limit(color, col):
     return row[col].values[0]
 
 
-lab_limits = {
-    "dL": (
-        get_limit(color_sel, "ΔL LCL"),
-        get_limit(color_sel, "ΔL UCL"),
-    ),
-    "da": (
-        get_limit(color_sel, "Δa LCL"),
-        get_limit(color_sel, "Δa UCL"),
-    ),
-    "db": (
-        get_limit(color_sel, "Δb LCL"),
-        get_limit(color_sel, "Δb UCL"),
-    ),
+limits = {
+    "dL": (get_limit(color_sel, "ΔL LCL"), get_limit(color_sel, "ΔL UCL")),
+    "da": (get_limit(color_sel, "Δa LCL"), get_limit(color_sel, "Δa UCL")),
+    "db": (get_limit(color_sel, "Δb LCL"), get_limit(color_sel, "Δb UCL")),
 }
-
-# hiện tại LINE dùng chung limit (sau này tách sheet thì đổi)
-line_limits = lab_limits
 
 # =====================================================
 # SPC CHART FUNCTION
@@ -133,21 +155,20 @@ def spc_chart(data, col, title, lcl, ucl):
 
     for i, v in enumerate(y):
         if lcl is not None and ucl is not None and (v < lcl or v > ucl):
-            ax.scatter(i, v, color="red", zorder=3)
+            ax.scatter(i, v, color="red")
         elif abs(v - mean) > 3 * std:
-            ax.scatter(i, v, color="orange", zorder=3)
+            ax.scatter(i, v, color="orange")
         else:
-            ax.scatter(i, v, color="black", zorder=3)
+            ax.scatter(i, v, color="black")
 
     ax.plot(y, alpha=0.4)
-
     ax.axhline(mean, color="blue", linestyle="--", label="Mean")
     ax.axhline(mean + 3 * std, color="orange", linestyle=":")
     ax.axhline(mean - 3 * std, color="orange", linestyle=":")
 
     if lcl is not None and ucl is not None:
-        ax.axhline(lcl, color="red", label="Internal LCL")
-        ax.axhline(ucl, color="red", label="Internal UCL")
+        ax.axhline(lcl, color="red", label="LCL")
+        ax.axhline(ucl, color="red", label="UCL")
 
     ax.set_title(title)
     ax.legend()
@@ -159,56 +180,30 @@ def spc_chart(data, col, title, lcl, ucl):
 # =====================================================
 st.title("🎨 SPC Color Control Dashboard")
 
-# -----------------------------------------------------
-# COMBINED – HIỂN THỊ ĐẦU TIÊN
-# -----------------------------------------------------
-st.subheader("📌 COMBINED SPC – LAB & LINE Overview")
+# ---- COMBINED FIRST ----
+st.subheader("📌 COMBINED SPC – LINE Priority")
 
-fig = spc_chart(
-    df,
-    "dL_line",
-    "COMBINED ΔL (Priority: LINE)",
-    line_limits["dL"][0],
-    line_limits["dL"][1],
+st.pyplot(
+    spc_chart(
+        df,
+        "dL_line",
+        "COMBINED ΔL",
+        limits["dL"][0],
+        limits["dL"][1],
+    )
 )
-st.pyplot(fig)
 
 st.markdown("---")
 
-# -----------------------------------------------------
-# LAB / LINE TABS
-# -----------------------------------------------------
+# ---- DETAIL ----
 tabs = st.tabs(["LAB SPC", "LINE SPC"])
 
 with tabs[0]:
-    st.subheader("LAB SPC")
-    st.pyplot(spc_chart(df, "dL_lab", "LAB ΔL", *lab_limits["dL"]))
-    st.pyplot(spc_chart(df, "da_lab", "LAB Δa", *lab_limits["da"]))
-    st.pyplot(spc_chart(df, "db_lab", "LAB Δb", *lab_limits["db"]))
+    st.pyplot(spc_chart(df, "dL_lab", "LAB ΔL", *limits["dL"]))
+    st.pyplot(spc_chart(df, "da_lab", "LAB Δa", *limits["da"]))
+    st.pyplot(spc_chart(df, "db_lab", "LAB Δb", *limits["db"]))
 
 with tabs[1]:
-    st.subheader("LINE SPC")
-    st.pyplot(spc_chart(df, "dL_line", "LINE ΔL", *line_limits["dL"]))
-    st.pyplot(spc_chart(df, "da_line", "LINE Δa", *line_limits["da"]))
-    st.pyplot(spc_chart(df, "db_line", "LINE Δb", *line_limits["db"]))
-
-# =====================================================
-# SUMMARY NG
-# =====================================================
-st.subheader("📊 NG Summary by Month")
-
-if line_limits["dL"][0] is not None:
-    ng_df = df[
-        (df["dL_line"] < line_limits["dL"][0])
-        | (df["dL_line"] > line_limits["dL"][1])
-    ]
-
-    summary = (
-        ng_df.groupby(["Year", "Month"])
-        .size()
-        .reset_index(name="NG Count")
-    )
-
-    st.dataframe(summary)
-else:
-    st.info("No internal limits found for this color code.")
+    st.pyplot(spc_chart(df, "dL_line", "LINE ΔL", *limits["dL"]))
+    st.pyplot(spc_chart(df, "da_line", "LINE Δa", *limits["da"]))
+    st.pyplot(spc_chart(df, "db_line", "LINE Δb", *limits["db"]))
