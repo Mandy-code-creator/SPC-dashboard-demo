@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import numpy as np
-from scipy.stats import norm
+import math
 
 # =========================
 # PAGE CONFIG
@@ -142,88 +142,14 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHART FUNCTIONS
+# NORMAL PDF (NO SCIPY)
 # =========================
-def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
+def normal_pdf(x, mean, std):
+    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
 
-    mean = line["value"].mean()
-    std = line["value"].std()
-
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
-
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
-
-    def right_label(y, text, color, va):
-        ax.text(
-            1.01, y, text,
-            transform=ax.get_yaxis_transform(),
-            color=color,
-            va=va,
-            fontsize=9,
-            clip_on=False
-        )
-
-    right_label(mean + 3 * std, "+3σ", "orange", "bottom")
-    right_label(mean - 3 * std, "-3σ", "orange", "top")
-
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
-        right_label(lab_lim[0], "LAB LCL", "#1f77b4", "top")
-        right_label(lab_lim[1], "LAB UCL", "#1f77b4", "bottom")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red")
-        ax.axhline(line_lim[1], color="red")
-        right_label(line_lim[0], "LINE LCL", "red", "top")
-        right_label(line_lim[1], "LINE UCL", "red", "bottom")
-
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-
-    return fig
-
-def spc_single(spc, title, limit, color):
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    mean = spc["value"].mean()
-    std = spc["value"].std()
-
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
-
-    def right_label(y, text):
-        ax.text(
-            1.01, y, text,
-            transform=ax.get_yaxis_transform(),
-            color="red",
-            va="center",
-            fontsize=9,
-            clip_on=False
-        )
-
-    right_label(mean + 3 * std, "+3σ")
-    right_label(mean - 3 * std, "-3σ")
-
-    if limit[0] is not None:
-        ax.axhline(limit[0], color="red")
-        ax.axhline(limit[1], color="red")
-        right_label(limit[0], "LCL")
-        right_label(limit[1], "UCL")
-
-    ax.set_title(title)
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-
-    return fig
-
+# =========================
+# DISTRIBUTION CHART
+# =========================
 def spc_distribution(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(8, 4))
 
@@ -243,7 +169,7 @@ def spc_distribution(spc, title, limit, color):
         patch.set_alpha(0.75)
 
     x = np.linspace(values.min(), values.max(), 200)
-    pdf = norm.pdf(x, mean, std)
+    pdf = normal_pdf(x, mean, std)
     scale = len(values) * (bins[1] - bins[0])
     ax.plot(x, pdf * scale, color="black", linewidth=2, label="Normal Curve")
 
@@ -253,9 +179,9 @@ def spc_distribution(spc, title, limit, color):
         ax.axvline(lcl, color="red", label="LCL")
         ax.axvline(ucl, color="red", label="UCL")
 
-        cp = (ucl - lcl) / (6 * std) if std > 0 else 0
-        cpk = min(ucl - mean, mean - lcl) / (3 * std) if std > 0 else 0
-        ca = abs(mean - center) / ((ucl - lcl) / 2) if std > 0 else 0
+        cp = (ucl - lcl) / (6 * std)
+        cpk = min(ucl - mean, mean - lcl) / (3 * std)
+        ca = abs(mean - center) / ((ucl - lcl) / 2)
 
         ax.text(
             0.98, 0.95,
@@ -275,79 +201,21 @@ def spc_distribution(spc, title, limit, color):
 
     return fig
 
-def download(fig, name):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
-    buf.seek(0)
-    st.download_button("📥 Download PNG", buf, name, "image/png")
-
-# =========================
-# PREP DATA
-# =========================
-spc = {
-    "ΔL": {
-        "lab": prep_lab(df, "入料檢測 ΔL 正面"),
-        "line": prep_spc(df, "正-北 ΔL", "正-南 ΔL")
-    },
-    "Δa": {
-        "lab": prep_lab(df, "入料檢測 Δa 正面"),
-        "line": prep_spc(df, "正-北 Δa", "正-南 Δa")
-    },
-    "Δb": {
-        "lab": prep_lab(df, "入料檢測 Δb 正面"),
-        "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
-    }
-}
-
 # =========================
 # MAIN
 # =========================
-st.title(f"🎨 SPC Color Dashboard — {color}")
+st.title(f"🎨 SPC Distribution — {color}")
 
-st.markdown("### 📊 COMBINED SPC")
-for k in spc:
-    fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE")
-    )
-    st.pyplot(fig)
-    download(fig, f"COMBINED_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 🧪 LAB SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["lab"],
-        f"LAB {k}",
-        get_limit(color, k, "LAB"),
-        "#1f77b4"
-    )
-    st.pyplot(fig)
-    download(fig, f"LAB_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 🏭 LINE SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["line"],
-        f"LINE {k}",
-        get_limit(color, k, "LINE"),
-        "#2ca02c"
-    )
-    st.pyplot(fig)
-    download(fig, f"LINE_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 📈 SPC Distribution (Cp / Cpk / Ca)")
-for k in spc:
+for k, col in {
+    "ΔL": "正-北 ΔL",
+    "Δa": "正-北 Δa",
+    "Δb": "正-北 Δb"
+}.items():
+    spc_line = prep_spc(df, col, col)
     fig = spc_distribution(
-        spc[k]["line"],
+        spc_line,
         f"Distribution {k}",
         get_limit(color, k, "LINE"),
         "#6f42c1"
     )
     st.pyplot(fig)
-    download(fig, f"DIST_{color}_{k}.png")
