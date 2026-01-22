@@ -35,7 +35,7 @@ DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
 
 # =========================
-# REFRESH BUTTON (TOP)
+# REFRESH BUTTON
 # =========================
 if st.button("🔄 Refresh data"):
     st.cache_data.clear()
@@ -144,7 +144,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# ⏱ TIME BOX — FIGURE LEVEL (FIX 100%)
+# ⏱ TIME BOX (FIGURE LEVEL)
 # =========================
 def add_time_box(fig, spc_df):
     if spc_df.empty:
@@ -167,7 +167,7 @@ def add_time_box(fig, spc_df):
     )
 
 # =========================
-# SPC CHARTS (GIỮ NGUYÊN)
+# SPC CHARTS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -274,11 +274,24 @@ for i, k in enumerate(spc):
         values = spc[k]["line"]["value"].dropna()
         mean = values.mean()
         std = values.std()
+        lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
+        _, _, patches = ax.hist(
+            values,
+            bins=bins,
+            edgecolor="white",
+            alpha=0.85
+        )
 
-        ax.hist(values, bins=bins, color="#4dabf7", edgecolor="white", alpha=0.85)
+        for p, l, r in zip(patches, bins[:-1], bins[1:]):
+            c = (l + r) / 2
+            p.set_facecolor(
+                "red"
+                if lcl is not None and ucl is not None and (c < lcl or c > ucl)
+                else "#4dabf7"
+            )
 
         x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
         pdf = normal_pdf(x, mean, std)
