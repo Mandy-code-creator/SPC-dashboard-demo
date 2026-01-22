@@ -161,11 +161,15 @@ def get_limit(color, prefix, factor):
 # =========================
 def prep_spc(df, north, south):
     tmp = df.copy()
-    tmp["value"] = tmp[[north, south]].mean(axis=1, skipna=False)
+    tmp["cuon_value"] = tmp[[north, south]].mean(axis=1, skipna=False)
+
     return tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
-        value=("value", "mean")
+        mean=("cuon_value", "mean"),
+        min=("cuon_value", "min"),
+        max=("cuon_value", "max")
     )
+
 
 def prep_lab(df, col):
     return df.groupby("製造批號", as_index=False).agg(
@@ -217,13 +221,17 @@ summary_lab = []
 
 for k in spc:
     # ===== LINE =====
-    line_values = spc[k]["line"]["value"].dropna()
-    line_mean = line_values.mean()
-    line_std = line_values.std()
-    line_n = line_values.count()
+    # ===== LINE =====
+line_df = spc[k]["line"]
 
-    line_min = line_values.min()
-    line_max = line_values.max()
+line_values = line_df["mean"].dropna()
+line_mean = line_values.mean()
+line_std = line_values.std()
+line_n = line_values.count()
+
+line_min = line_df["min"].min()
+line_max = line_df["max"].max()
+
 
     lcl, ucl = get_limit(color, k, "LINE")
 
@@ -477,6 +485,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
