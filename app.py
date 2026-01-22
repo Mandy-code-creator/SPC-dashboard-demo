@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import io
 import numpy as np
 import math
 
@@ -90,7 +89,7 @@ st.sidebar.divider()
 st.sidebar.markdown("## 📊 SPC Statistics")
 
 # =========================
-# LIMIT FUNCTIONS
+# LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -119,7 +118,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHART FUNCTIONS
+# TIME TEXTBOX
 # =========================
 def add_time_box(ax, spc_df):
     t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
@@ -127,19 +126,23 @@ def add_time_box(ax, spc_df):
 
     ax.text(
         1.02, 0.02,
-        f"Time range:\n{t_min} → {t_max}",
+        f"⏱ Time range\n{t_min} → {t_max}",
         transform=ax.transAxes,
         fontsize=9,
         va="bottom",
         bbox=dict(
-            boxstyle="round,pad=0.3",
+            boxstyle="round,pad=0.35",
             fc="#f8f9fa",
             ec="#ced4da"
         )
     )
 
+# =========================
+# SPC CHART FUNCTIONS
+# =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
+    fig.subplots_adjust(right=0.78)
 
     mean = line["value"].mean()
     std = line["value"].std()
@@ -169,6 +172,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
 
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
+    fig.subplots_adjust(right=0.78)
 
     mean = spc["value"].mean()
     std = spc["value"].std()
@@ -216,7 +220,7 @@ for k in spc:
     st.sidebar.markdown(f"**{k}**  \nMean = {v.mean():.3f}  \nStd = {v.std():.3f}")
 
 # =========================
-# MAIN SPC CHARTS
+# MAIN SPC
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
