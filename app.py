@@ -95,11 +95,20 @@ else:
 month_text = "All" if not month else ", ".join(map(str, month))
 
 # =========================
-# TITLE (THIS WILL ALWAYS SHOW)
+# TITLE + TIME RANGE (100% HIỆN)
 # =========================
-st.title(
-    f"🎨 SPC Color Dashboard — {color}\n"
-    f"⏱ {t_min} → {t_max} | n = {n_batch} batches | Year: {year} | Month: {month_text}"
+st.markdown(
+    f"""
+    <div style="margin-bottom:1.2rem">
+        <h1 style="margin-bottom:0.3rem;">
+            🎨 SPC Color Dashboard — {color}
+        </h1>
+        <div style="color:#6c757d;font-size:0.95rem;">
+            ⏱ {t_min} → {t_max} | n = {n_batch} batches | Year: {year} | Month: {month_text}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 # =========================
