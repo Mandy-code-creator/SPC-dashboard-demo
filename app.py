@@ -22,20 +22,6 @@ if st.button("🔄 Refresh data"):
     st.rerun()
 
 # =========================
-# SIDEBAR STYLE
-# =========================
-st.markdown(
-    """
-    <style>
-    [data-testid="stSidebar"] {
-        background-color: #f6f8fa;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# =========================
 # GOOGLE SHEET LINKS
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
@@ -54,14 +40,14 @@ def load_data():
 def load_limit():
     return pd.read_csv(LIMIT_URL)
 
-df = load_data()
+df_raw = load_data()
 limit_df = load_limit()
 
 # =========================
 # FIX COLUMN NAMES
 # =========================
-df.columns = (
-    df.columns
+df_raw.columns = (
+    df_raw.columns
     .str.replace("\r\n", " ", regex=False)
     .str.replace("\n", " ", regex=False)
     .str.replace("　", " ", regex=False)
@@ -74,57 +60,53 @@ df.columns = (
 # =========================
 st.sidebar.title("🎨 Filter")
 
-color = st.sidebar.selectbox(
-    "Color code",
-    sorted(df["塗料編號"].dropna().unique())
-)
+color_list = sorted(df_raw["塗料編號"].dropna().unique())
+color = st.sidebar.selectbox("Color code", color_list)
 
-df = df[df["塗料編號"] == color]
+df = df_raw[df_raw["塗料編號"] == color].copy()
 
-latest_year = int(df["Time"].dt.year.max())
-year = st.sidebar.selectbox(
-    "Year",
-    sorted(df["Time"].dt.year.dropna().unique()),
-    index=list(sorted(df["Time"].dt.year.dropna().unique())).index(latest_year)
-)
+# ---- SAFE YEAR FILTER ----
+year_list = sorted(df["Time"].dt.year.dropna().unique())
+if year_list:
+    year = st.sidebar.selectbox("Year", year_list, index=len(year_list) - 1)
+    df = df[df["Time"].dt.year == year]
+else:
+    year = "N/A"
 
-month = st.sidebar.multiselect(
-    "Month (optional)",
-    sorted(df["Time"].dt.month.dropna().unique())
-)
+# ---- SAFE MONTH FILTER ----
+month_list = sorted(df["Time"].dt.month.dropna().unique())
+month = st.sidebar.multiselect("Month (optional)", month_list)
 
-df = df[df["Time"].dt.year == year]
 if month:
     df = df[df["Time"].dt.month.isin(month)]
 
 # =========================
-# DASHBOARD TIME RANGE TEXT
+# DASHBOARD TIME RANGE (ABSOLUTELY SAFE)
 # =========================
 def build_dashboard_time_range(df, year, month):
-    if "Time" not in df.columns:
-        return "⏱ N/A | n = 0 batches"
+    if df is None or df.empty or "Time" not in df.columns:
+        return "⏱ N/A | n = 0 batches | Year: N/A | Month: N/A"
 
     t = df["Time"].dropna()
     if t.empty:
-        return "⏱ N/A | n = 0 batches"
+        return "⏱ N/A | n = 0 batches | Year: N/A | Month: N/A"
 
     n = df["製造批號"].nunique()
     month_text = "All" if not month else ", ".join(map(str, month))
 
     return (
         f"⏱ {t.min().strftime('%Y-%m-%d')} → {t.max().strftime('%Y-%m-%d')} | "
-        f"n = {n} batches | "
-        f"Year: {year} | Month: {month_text}"
+        f"n = {n} batches | Year: {year} | Month: {month_text}"
     )
 
 # =========================
-# TITLE
+# TITLE (THIS WILL ALWAYS SHOW)
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
 st.markdown(
     f"""
-    <div style="color:#6c757d;font-size:0.95rem;margin-top:-10px;">
+    <div style="color:#6c757d;font-size:0.95rem;margin-top:-12px;">
     {build_dashboard_time_range(df, year, month)}
     </div>
     """,
@@ -163,32 +145,6 @@ def prep_lab(df, col):
 # =========================
 # SPC CHART FUNCTIONS
 # =========================
-def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    mean = line["value"].mean()
-    std = line["value"].std()
-
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
-
-    ax.axhline(mean + 3 * std, linestyle="--", color="orange")
-    ax.axhline(mean - 3 * std, linestyle="--", color="orange")
-
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], linestyle=":", label="LAB UCL")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
-
-    ax.set_title(title, loc="left")
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-    return fig
-
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
     mean = spc["value"].mean()
@@ -203,10 +159,8 @@ def spc_single(spc, title, limit, color):
         ax.axhline(limit[1], color="red", label="UCL")
 
     ax.set_title(title, loc="left")
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
     return fig
 
 def download(fig, name):
@@ -219,55 +173,22 @@ def download(fig, name):
 # PREP DATA
 # =========================
 spc = {
-    "ΔL": {
-        "lab": prep_lab(df, "入料檢測 ΔL 正面"),
-        "line": prep_spc(df, "正-北 ΔL", "正-南 ΔL")
-    },
-    "Δa": {
-        "lab": prep_lab(df, "入料檢測 Δa 正面"),
-        "line": prep_spc(df, "正-北 Δa", "正-南 Δa")
-    },
-    "Δb": {
-        "lab": prep_lab(df, "入料檢測 Δb 正面"),
-        "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
-    }
+    "ΔL": prep_lab(df, "入料檢測 ΔL 正面"),
+    "Δa": prep_lab(df, "入料檢測 Δa 正面"),
+    "Δb": prep_lab(df, "入料檢測 Δb 正面"),
 }
 
 # =========================
 # MAIN DASHBOARD
 # =========================
-st.markdown("### 📊 COMBINED SPC")
-for k in spc:
-    fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE")
-    )
-    st.pyplot(fig)
-    download(fig, f"COMBINED_{color}_{k}.png")
-
-st.markdown("---")
 st.markdown("### 🧪 LAB SPC")
-for k in spc:
+
+for k, spc_df in spc.items():
     fig = spc_single(
-        spc[k]["lab"],
+        spc_df,
         f"LAB {k}",
         get_limit(color, k, "LAB"),
         "#1f77b4"
     )
     st.pyplot(fig)
     download(fig, f"LAB_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 🏭 LINE SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["line"],
-        f"LINE {k}",
-        get_limit(color, k, "LINE"),
-        "#2ca02c"
-    )
-    st.pyplot(fig)
-    download(fig, f"LINE_{color}_{k}.png")
