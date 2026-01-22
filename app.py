@@ -116,7 +116,7 @@ show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# 🔹 CHANGED: SPC SUMMARY IN SIDEBAR (MEAN & STD ONLY)
+# SIDEBAR – SPC STATISTICS (MEAN / STD ONLY)
 # =========================
 st.sidebar.markdown("## 📊 SPC Statistics")
 
@@ -150,7 +150,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS (GIỮ NGUYÊN)
+# SPC CHARTS (GIỮ NGUYÊN + KHÔI PHỤC LEGEND)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -161,16 +161,16 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
 
     if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red")
-        ax.axhline(line_lim[1], color="red")
+        ax.axhline(line_lim[0], color="red", label="LINE LCL")
+        ax.axhline(line_lim[1], color="red", label="LINE UCL")
 
     ax.set_title(title)
     ax.legend()
@@ -184,15 +184,16 @@ def spc_single(spc, title, limit, color):
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+    ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red")
-        ax.axhline(limit[1], color="red")
+        ax.axhline(limit[0], color="red", label="LCL")
+        ax.axhline(limit[1], color="red", label="UCL")
 
     ax.set_title(title)
+    ax.legend()
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
     return fig
@@ -222,13 +223,13 @@ spc = {
 }
 
 # =========================
-# 🔹 CHANGED: FILL SIDEBAR STATS (NO CHART IMPACT)
+# FILL SIDEBAR STATISTICS
 # =========================
 for k in spc:
-    values = spc[k]["line"]["value"].dropna()
+    v = spc[k]["line"]["value"].dropna()
     st.sidebar.markdown(f"### {k}")
-    st.sidebar.write(f"Mean: {values.mean():.3f}")
-    st.sidebar.write(f"Std (σ): {values.std():.3f}")
+    st.sidebar.write(f"Mean: {v.mean():.3f}")
+    st.sidebar.write(f"Std (σ): {v.std():.3f}")
 
 # =========================
 # MAIN – BIỂU ĐỒ GỐC
@@ -289,7 +290,6 @@ for i, k in enumerate(spc):
         values = spc[k]["line"]["value"].dropna()
         mean = values.mean()
         std = values.std()
-        lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
