@@ -177,12 +177,21 @@ def mark_out_of_control(ax, x, y, mean, std, limit):
         )
 
 # =========================
-# LEGEND CLEAN
+# 🔧 LEGEND – NGOÀI BIỂU ĐỒ (CHỈ SỬA PHẦN NÀY)
 # =========================
 def finalize_legend(ax):
-    h, l = ax.get_legend_handles_labels()
-    uniq = dict(zip(l, h))
-    ax.legend(uniq.values(), uniq.keys())
+    handles, labels = ax.get_legend_handles_labels()
+    unique = dict(zip(labels, handles))
+
+    ax.legend(
+        unique.values(),
+        unique.keys(),
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        borderaxespad=0,
+        frameon=True,
+        fontsize=9
+    )
 
 # =========================
 # SPC CHARTS
