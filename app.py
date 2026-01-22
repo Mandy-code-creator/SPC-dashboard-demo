@@ -162,19 +162,17 @@ def get_limit(color, prefix, factor):
 def prep_spc(df, north, south):
     tmp = df.copy()
 
-    # chỉ lấy cuộn có đủ Bắc & Nam
+    # 🔴 DÒNG QUYẾT ĐỊNH – LOẠI CUỘN THIẾU BẮC / NAM
     tmp = tmp.dropna(subset=[north, south])
 
-    # mỗi dòng = 1 cuộn
+    # mỗi dòng = 1 cuộn hợp lệ
     tmp["value"] = tmp[[north, south]].mean(axis=1)
 
     # gộp CUỘN → BATCH
     batch_df = (
         tmp
         .groupby("製造批號", as_index=False)
-        .agg(
-            value=("value", "mean")
-        )
+        .agg(value=("value", "mean"))
     )
 
     return batch_df
@@ -508,6 +506,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
