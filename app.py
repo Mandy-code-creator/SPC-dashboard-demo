@@ -138,7 +138,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS (LEGEND CHUẨN)
+# SPC CHARTS
 # =========================
 def finalize_legend(ax):
     handles, labels = ax.get_legend_handles_labels()
@@ -237,7 +237,7 @@ spc = {
 }
 
 # =========================
-# MAIN
+# MAIN – SPC
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
@@ -278,3 +278,43 @@ for k in spc:
     )
     st.pyplot(fig)
     download(fig, f"LINE_{color}_{k}.png")
+
+# =========================
+# DASHBOARD – DISTRIBUTION
+# =========================
+st.markdown("---")
+st.markdown("## 📈 Process Distribution Dashboard")
+
+def normal_pdf(x, mean, std):
+    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
+
+cols = st.columns(3)
+
+for i, k in enumerate(spc):
+    with cols[i]:
+        values = spc[k]["line"]["value"].dropna()
+        mean = values.mean()
+        std = values.std()
+        lcl, ucl = get_limit(color, k, "LINE")
+        center = (ucl + lcl) / 2 if lcl is not None else None
+
+        fig, ax = plt.subplots(figsize=(4, 3))
+        bins = np.histogram_bin_edges(values, bins=10)
+        _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
+
+        for p, l, r in zip(patches, bins[:-1], bins[1:]):
+            c = (l + r) / 2
+            p.set_facecolor("red" if lcl and (c < lcl or c > ucl) else "#6f42c1")
+            p.set_alpha(0.8)
+
+        x = np.linspace(values.min(), values.max(), 200)
+        pdf = normal_pdf(x, mean, std)
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
+
+        cp = (ucl - lcl) / (6 * std)
+        cpk = min(ucl - mean, mean - lcl) / (3 * std)
+        ca = abs(mean - center) / ((ucl - lcl) / 2)
+
+        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
+        ax.grid(axis="y", alpha=0.3)
+        st.pyplot(fig)
