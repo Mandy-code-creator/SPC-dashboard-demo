@@ -162,16 +162,17 @@ def get_limit(color, prefix, factor):
 def prep_spc(df, north, south):
     tmp = df[["製造批號", "Time", north, south]].copy()
 
-    # tách Bắc / Nam thành cuộn riêng
+    # coi Bắc và Nam là 2 cuộn độc lập
     north_df = tmp[["製造批號", "Time", north]].rename(columns={north: "value"})
     south_df = tmp[["製造批號", "Time", south]].rename(columns={south: "value"})
 
+    # gộp tất cả cuộn
     coil_df = pd.concat([north_df, south_df], ignore_index=True)
 
     # loại cuộn lỗi
     coil_df = coil_df.dropna(subset=["value"])
 
-    # GỘP CUỘN → BATCH
+    # TÍNH THEO BATCH
     batch_df = (
         coil_df
         .groupby("製造批號", as_index=False)
@@ -182,6 +183,7 @@ def prep_spc(df, north, south):
     )
 
     return batch_df
+
 
 
 def prep_lab(df, col):
@@ -495,6 +497,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
