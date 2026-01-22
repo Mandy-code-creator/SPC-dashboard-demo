@@ -35,7 +35,7 @@ DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
 
 # =========================
-# REFRESH BUTTON
+# REFRESH BUTTON (TOP)
 # =========================
 if st.button("🔄 Refresh data"):
     st.cache_data.clear()
@@ -144,34 +144,20 @@ def prep_lab(df, col):
     )
 
 # =========================
-# ⏱ TIME BOX (FIGURE LEVEL)
+# SHOW TIME RANGE (STREAMLIT UI)
 # =========================
-def add_time_box(fig, spc_df):
+def show_time_range(spc_df):
     if spc_df.empty:
         return
-
     t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
     t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
-
-    fig.text(
-        0.82, 0.12,
-        f"⏱ Time range\n{t_min} → {t_max}",
-        fontsize=9,
-        va="bottom",
-        ha="left",
-        bbox=dict(
-            boxstyle="round,pad=0.35",
-            fc="#f8f9fa",
-            ec="#ced4da"
-        )
-    )
+    st.caption(f"⏱ Time range: **{t_min} → {t_max}**")
 
 # =========================
-# SPC CHARTS
+# SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
-    fig.subplots_adjust(right=0.78)
 
     mean = line["value"].mean()
     std = line["value"].std()
@@ -193,14 +179,12 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
+    ax.legend()
 
-    add_time_box(fig, line)
     return fig
 
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
-    fig.subplots_adjust(right=0.78)
 
     mean = spc["value"].mean()
     std = spc["value"].std()
@@ -216,9 +200,8 @@ def spc_single(spc, title, limit, color):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
+    ax.legend()
 
-    add_time_box(fig, spc)
     return fig
 
 def download(fig, name):
@@ -260,6 +243,7 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
+    show_time_range(spc[k]["line"])
     download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
@@ -282,16 +266,14 @@ for i, k in enumerate(spc):
             values,
             bins=bins,
             edgecolor="white",
-            alpha=0.85
+            alpha=0.85,
+            color="#4dabf7"
         )
 
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
-            p.set_facecolor(
-                "red"
-                if lcl is not None and ucl is not None and (c < lcl or c > ucl)
-                else "#4dabf7"
-            )
+            if lcl is not None and ucl is not None and (c < lcl or c > ucl):
+                p.set_facecolor("red")
 
         x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
         pdf = normal_pdf(x, mean, std)
