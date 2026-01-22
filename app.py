@@ -144,21 +144,21 @@ def prep_lab(df, col):
     )
 
 # =========================
-# TIME BOX (⏱ FIX CLIP)
+# ⏱ TIME BOX — FIGURE LEVEL (FIX 100%)
 # =========================
-def add_time_box(ax, spc_df):
+def add_time_box(fig, spc_df):
     if spc_df.empty:
         return
+
     t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
     t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
 
-    ax.text(
-        1.02, 0.02,
+    fig.text(
+        0.82, 0.12,
         f"⏱ Time range\n{t_min} → {t_max}",
-        transform=ax.transAxes,
         fontsize=9,
         va="bottom",
-        clip_on=False,   # 🔥 QUAN TRỌNG
+        ha="left",
         bbox=dict(
             boxstyle="round,pad=0.35",
             fc="#f8f9fa",
@@ -167,7 +167,7 @@ def add_time_box(ax, spc_df):
     )
 
 # =========================
-# SPC CHARTS
+# SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -195,7 +195,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.tick_params(axis="x", rotation=45)
     ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
 
-    add_time_box(ax, line)
+    add_time_box(fig, line)
     return fig
 
 def spc_single(spc, title, limit, color):
@@ -218,7 +218,7 @@ def spc_single(spc, title, limit, color):
     ax.tick_params(axis="x", rotation=45)
     ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
 
-    add_time_box(ax, spc)
+    add_time_box(fig, spc)
     return fig
 
 def download(fig, name):
@@ -274,7 +274,6 @@ for i, k in enumerate(spc):
         values = spc[k]["line"]["value"].dropna()
         mean = values.mean()
         std = values.std()
-        lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
@@ -285,6 +284,6 @@ for i, k in enumerate(spc):
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
-        ax.set_title(f"{k}")
+        ax.set_title(k)
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
