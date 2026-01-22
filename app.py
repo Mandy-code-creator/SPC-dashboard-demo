@@ -145,7 +145,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS (GIỮ NGUYÊN)
+# SPC CHARTS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -202,14 +202,14 @@ def download(fig, name):
     st.download_button("📥 Download PNG", buf, name, "image/png")
 
 # =========================
-# TIME RANGE (CHẮC CHẮN HIỂN THỊ)
+# TIME RANGE (THEO SPC DATA)
 # =========================
-def show_time_range_from_df(df):
-    if df.empty:
+def show_time_range_from_spc(spc_df):
+    if spc_df.empty:
         st.caption("⏱ Time range: N/A")
         return
-    t_min = df["Time"].min().strftime("%Y-%m-%d")
-    t_max = df["Time"].max().strftime("%Y-%m-%d")
+    t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
+    t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
     st.caption(f"⏱ Time range: **{t_min} → {t_max}**")
 
 # =========================
@@ -245,7 +245,9 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
-    show_time_range_from_df(df)
+    show_time_range_from_spc(
+        pd.concat([spc[k]["lab"], spc[k]["line"]])
+    )
     download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
@@ -259,7 +261,7 @@ for k in spc:
         "#1f77b4"
     )
     st.pyplot(fig)
-    show_time_range_from_df(df)
+    show_time_range_from_spc(spc[k]["lab"])
     download(fig, f"LAB_{color}_{k}.png")
 
 st.markdown("---")
@@ -273,7 +275,7 @@ for k in spc:
         "#2ca02c"
     )
     st.pyplot(fig)
-    show_time_range_from_df(df)
+    show_time_range_from_spc(spc[k]["line"])
     download(fig, f"LINE_{color}_{k}.png")
 
 # =========================
@@ -303,7 +305,7 @@ for i, k in enumerate(spc):
             if lcl is not None and ucl is not None and (c < lcl or c > ucl):
                 p.set_facecolor("red")
 
-        x = np.linspace(mean - 3*std, mean + 3*std, 300)
+        x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
