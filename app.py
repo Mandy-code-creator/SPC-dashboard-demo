@@ -221,7 +221,8 @@ summary_lab = []
 
 for k in spc:
     # ================= LINE (theo BATCH) =================
-    line_df = spc[k]["line"].dropna(subset=["value"])
+    line_df = spc[k]["line"]
+    line_df = line_df[line_df["value"].notna()]
 
     line_values = line_df["value"]
 
@@ -256,7 +257,8 @@ for k in spc:
     })
 
     # ================= LAB (theo BATCH) =================
-    lab_df = spc[k]["lab"].dropna(subset=["value"])
+    lab_df = spc[k]["lab"]
+    lab_df = lab_df[lab_df["value"].notna()]
 
     lab_values = lab_df["value"]
 
@@ -276,24 +278,6 @@ for k in spc:
         "n": lab_n
     })
 
-
-    # ===== LAB =====
-    lab_values = spc[k]["lab"]["value"].dropna()
-    lab_mean = lab_values.mean()
-    lab_std = lab_values.std()
-    lab_n = lab_values.count()
-
-    lab_min = lab_values.min()
-    lab_max = lab_values.max()
-
-    summary_lab.append({
-        "Factor": k,
-        "Min": round(lab_min, 2),
-        "Max": round(lab_max, 2),
-        "Mean": round(lab_mean, 2),
-        "Std Dev": round(lab_std, 2),
-        "n": lab_n
-    })
 
 summary_line_df = pd.DataFrame(summary_line)
 summary_lab_df = pd.DataFrame(summary_lab)
@@ -506,6 +490,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
