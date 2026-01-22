@@ -92,6 +92,12 @@ df.columns = (
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
+# =========================
+# FIX WRONG ΔL COLUMN (rL -> ΔL)
+# =========================
+df.rename(columns={
+    "入料檢測 rL 正面": "入料檢測 ΔL 正面"
+}, inplace=True)
 
 # =========================
 # SIDEBAR – FILTER
@@ -529,6 +535,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
