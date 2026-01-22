@@ -169,10 +169,20 @@ def prep_spc(df, north, south):
     )
 
 def prep_lab(df, col):
-    return df.groupby("製造批號", as_index=False).agg(
+    tmp = df.copy()
+
+    # 1️⃣ Chỉ giữ dòng có dữ liệu ΔL hợp lệ
+    tmp = tmp[pd.notnull(tmp[col])]
+
+    # 2️⃣ (tuỳ chọn) bỏ giá trị bất thường nếu cần
+    # tmp = tmp[tmp[col].between(-5, 5)]
+
+    # 3️⃣ Tính trung bình theo batch
+    return tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=(col, "mean")
     )
+
 
 # =========================
 # SPC DATA
@@ -535,6 +545,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
