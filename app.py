@@ -237,17 +237,20 @@ summary_lab = []
 
 for k in spc:
     # ================= LINE (theo BATCH) =================
-    line_df = spc[k]["line"]
-    line_df = line_df[line_df["value"].notna()]
+    # ===== LINE =====
+line_values = spc[k]["line"]["value"].dropna()
+line_mean = line_values.mean()
+line_std = line_values.std()
+line_n = line_values.count()
 
-    line_values = line_df["value"]
-
-    line_n = len(line_df)
-    line_mean = line_values.mean()
-    line_std = line_values.std(ddof=1)
-
+if k == "Δb":
+    raw_b = df[["正-北 Δb", "正-南 Δb"]].dropna()
+    line_min = raw_b.min().min()
+    line_max = raw_b.max().max()
+else:
     line_min = line_values.min()
     line_max = line_values.max()
+
 
     lcl, ucl = get_limit(color, k, "LINE")
 
@@ -506,6 +509,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
