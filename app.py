@@ -296,14 +296,14 @@ for i, k in enumerate(spc):
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
             if c < lcl or c > ucl:
-                p.set_facecolor("#dc3545")   # đỏ out-of-spec
+                p.set_facecolor("#d62728")   # đỏ out-of-spec
             else:
-                p.set_facecolor("#6f42c1")   # tím đẹp
+                p.set_facecolor("#1f77b4")   # tím đẹp
             p.set_alpha(0.85)
 
         x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
         pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="#212529")
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="#0b3c5d")
 
         cp = (ucl - lcl) / (6 * std)
         cpk = min(ucl - mean, mean - lcl) / (3 * std)
@@ -311,3 +311,4 @@ for i, k in enumerate(spc):
         ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
+
