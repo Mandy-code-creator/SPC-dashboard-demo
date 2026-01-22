@@ -1,41 +1,279 @@
-def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import numpy as np
+import math
 
-    mean = line["value"].mean()
-    std = line["value"].std()
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="SPC Color Dashboard",
+    page_icon="🎨",
+    layout="wide"
+)
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(
+            270deg,
+            #ffffff,
+            #f0f9ff,
+            #e0f2fe,
+            #fef3c7,
+            #ecfeff
+        );
+        background-size: 800% 800%;
+        animation: gradientBG 20s ease infinite;
+    }
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+# =========================
+# REFRESH BUTTON
+# =========================
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+# =========================
+# SIDEBAR STYLE
+# =========================
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #f6f8fa;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+# =========================
+# GOOGLE SHEET LINKS
+# =========================
+DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
+LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
 
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data(ttl=300)
+def load_data():
+    df = pd.read_csv(DATA_URL)
+    df["Time"] = pd.to_datetime(df["Time"])
+    return df
 
-    # ===== ĐÁNH DẤU CÁC ĐIỂM VƯỢT GIỚI HẠN =====
-    if line_lim[0] is not None and line_lim[1] is not None:
-        for batch, val in zip(line["製造批號"], line["value"]):
-            if val < line_lim[0] or val > line_lim[1]:
-                ax.scatter(batch, val, color="red", s=80, zorder=5)
-                ax.text(batch, val, f"{batch}\n{val:.2f}",
-                        color="red", fontsize=8, ha="center", va="bottom", rotation=45)
+@st.cache_data(ttl=300)
+def load_limit():
+    return pd.read_csv(LIMIT_URL)
 
-    if lab_lim[0] is not None and lab_lim[1] is not None:
-        for batch, val in zip(lab["製造批號"], lab["value"]):
-            if val < lab_lim[0] or val > lab_lim[1]:
-                ax.scatter(batch, val, color="red", s=80, marker="x", zorder=5)
-                ax.text(batch, val, f"{batch}\n{val:.2f}",
-                        color="red", fontsize=8, ha="center", va="bottom", rotation=45)
+df = load_data()
+limit_df = load_limit()
 
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-    return fig
+# =========================
+# FIX COLUMN NAMES
+# =========================
+df.columns = (
+    df.columns
+    .str.replace("\r\n", " ", regex=False)
+    .str.replace("\n", " ", regex=False)
+    .str.replace("　", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+    .str.strip()
+)
+
+# =========================
+# SIDEBAR – FILTER
+# =========================
+st.sidebar.title("🎨 Filter")
+
+color = st.sidebar.selectbox(
+    "Color code",
+    sorted(df["塗料編號"].dropna().unique())
+)
+
+df = df[df["塗料編號"] == color]
+
+latest_year = df["Time"].dt.year.max()
+year = st.sidebar.selectbox(
+    "Year",
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+)
+
+month = st.sidebar.multiselect(
+    "Month (optional)",
+    sorted(df["Time"].dt.month.unique())
+)
+
+df = df[df["Time"].dt.year == year]
+if month:
+    df = df[df["Time"].dt.month.isin(month)]
+
+st.sidebar.divider()
+
+# =========================
+# LIMIT DISPLAY
+# =========================
+def show_limits(factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return
+    table = row.filter(like=factor).copy()
+    for c in table.columns:
+        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+    st.sidebar.markdown(f"**{factor} Control Limits**")
+    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
+
+show_limits("LAB")
+show_limits("LINE")
+
+# =========================
+# LIMIT FUNCTION
+# =========================
+def get_limit(color, prefix, factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None, None
+    return (
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
+    )
+
+# =========================
+# PREP SPC DATA
+# =========================
+def prep_spc(df, north, south):
+    tmp = df.copy()
+    tmp["value"] = tmp[[north, south]].mean(axis=1)
+    return tmp.groupby("製造批號", as_index=False).agg(
+        Time=("Time", "min"),
+        value=("value", "mean")
+    )
+
+def prep_lab(df, col):
+    return df.groupby("製造批號", as_index=False).agg(
+        Time=("Time", "min"),
+        value=(col, "mean")
+    )
+
+# =========================
+# SPC DATA
+# =========================
+spc = {
+    "ΔL": {
+        "lab": prep_lab(df, "入料檢測 ΔL 正面"),
+        "line": prep_spc(df, "正-北 ΔL", "正-南 ΔL")
+    },
+    "Δa": {
+        "lab": prep_lab(df, "入料檢測 Δa 正面"),
+        "line": prep_spc(df, "正-北 Δa", "正-南 Δa")
+    },
+    "Δb": {
+        "lab": prep_lab(df, "入料檢測 Δb 正面"),
+        "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
+    }
+}
+
+# =========================
+# MAIN DASHBOARD
+# =========================
+st.title(f"🎨 SPC Color Dashboard — {color}")
+
+if not df.empty:
+    t_min = df["Time"].min().strftime("%Y-%m-%d")
+    t_max = df["Time"].max().strftime("%Y-%m-%d")
+    n_batch = df["製造批號"].nunique()
+else:
+    t_min = t_max = "N/A"
+    n_batch = 0
+
+st.markdown(
+    f"⏱ **{t_min} → {t_max} | n = {n_batch} batches | Year: {year} | Month: {'All' if not month else month}**"
+)
+
+# ======================================================
+# 📋 SPC SUMMARY TABLE (LAB & LINE)
+# ======================================================
+summary_line = []
+summary_lab = []
+
+for k in spc:
+    # ===== LINE =====
+    line_values = spc[k]["line"]["value"].dropna()
+    line_mean = line_values.mean()
+    line_std = line_values.std()
+    line_n = line_values.count()
+
+    line_min = line_values.min()
+    line_max = line_values.max()
+
+    lcl, ucl = get_limit(color, k, "LINE")
+
+    ca = cp = cpk = None
+    if line_std > 0 and lcl is not None and ucl is not None:
+        cp = (ucl - lcl) / (6 * line_std)
+        cpk = min(
+            (ucl - line_mean) / (3 * line_std),
+            (line_mean - lcl) / (3 * line_std)
+        )
+        ca = abs(line_mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
+
+    summary_line.append({
+        "Factor": k,
+        "Min": round(line_min, 2),
+        "Max": round(line_max, 2),
+        "Mean": round(line_mean, 2),
+        "Std Dev": round(line_std, 2),
+        "Ca": round(ca, 2) if ca is not None else "",
+        "Cp": round(cp, 2) if cp is not None else "",
+        "Cpk": round(cpk, 2) if cpk is not None else "",
+        "n": line_n
+    })
+
+    # ===== LAB =====
+    lab_values = spc[k]["lab"]["value"].dropna()
+    lab_mean = lab_values.mean()
+    lab_std = lab_values.std()
+    lab_n = lab_values.count()
+
+    lab_min = lab_values.min()
+    lab_max = lab_values.max()
+
+    summary_lab.append({
+        "Factor": k,
+        "Min": round(lab_min, 2),
+        "Max": round(lab_max, 2),
+        "Mean": round(lab_mean, 2),
+        "Std Dev": round(lab_std, 2),
+        "n": lab_n
+    })
+
+summary_line_df = pd.DataFrame(summary_line)
+summary_lab_df = pd.DataFrame(summary_lab)
+
+# =========================
+# DISPLAY SIDE BY SIDE
+# =========================
+st.markdown("### 📋 SPC Summary Statistics")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("#### 🏭 LINE")
+    st.dataframe(summary_line_df, use_container_width=True, hide_index=True)
+
+with col2:
+    st.markdown("#### 🧪 LAB")
+    st.data
