@@ -65,7 +65,7 @@ color = st.sidebar.selectbox("Color code", color_list)
 
 df = df_raw[df_raw["塗料編號"] == color].copy()
 
-# ---- SAFE YEAR FILTER ----
+# ---- YEAR FILTER (SAFE) ----
 year_list = sorted(df["Time"].dt.year.dropna().unique())
 if year_list:
     year = st.sidebar.selectbox("Year", year_list, index=len(year_list) - 1)
@@ -73,7 +73,7 @@ if year_list:
 else:
     year = "N/A"
 
-# ---- SAFE MONTH FILTER ----
+# ---- MONTH FILTER (SAFE) ----
 month_list = sorted(df["Time"].dt.month.dropna().unique())
 month = st.sidebar.multiselect("Month (optional)", month_list)
 
@@ -81,36 +81,25 @@ if month:
     df = df[df["Time"].dt.month.isin(month)]
 
 # =========================
-# DASHBOARD TIME RANGE (ABSOLUTELY SAFE)
+# BUILD TIME RANGE + N (ABSOLUTELY SAFE)
 # =========================
-def build_dashboard_time_range(df, year, month):
-    if df is None or df.empty or "Time" not in df.columns:
-        return "⏱ N/A | n = 0 batches | Year: N/A | Month: N/A"
+if df.empty or df["Time"].dropna().empty:
+    t_min = "N/A"
+    t_max = "N/A"
+    n_batch = 0
+else:
+    t_min = df["Time"].min().strftime("%Y-%m-%d")
+    t_max = df["Time"].max().strftime("%Y-%m-%d")
+    n_batch = df["製造批號"].nunique()
 
-    t = df["Time"].dropna()
-    if t.empty:
-        return "⏱ N/A | n = 0 batches | Year: N/A | Month: N/A"
-
-    n = df["製造批號"].nunique()
-    month_text = "All" if not month else ", ".join(map(str, month))
-
-    return (
-        f"⏱ {t.min().strftime('%Y-%m-%d')} → {t.max().strftime('%Y-%m-%d')} | "
-        f"n = {n} batches | Year: {year} | Month: {month_text}"
-    )
+month_text = "All" if not month else ", ".join(map(str, month))
 
 # =========================
 # TITLE (THIS WILL ALWAYS SHOW)
 # =========================
-st.title(f"🎨 SPC Color Dashboard — {color}")
-
-st.markdown(
-    f"""
-    <div style="color:#6c757d;font-size:0.95rem;margin-top:-12px;">
-    {build_dashboard_time_range(df, year, month)}
-    </div>
-    """,
-    unsafe_allow_html=True
+st.title(
+    f"🎨 SPC Color Dashboard — {color}\n"
+    f"⏱ {t_min} → {t_max} | n = {n_batch} batches | Year: {year} | Month: {month_text}"
 )
 
 # =========================
@@ -128,14 +117,6 @@ def get_limit(color, prefix, factor):
 # =========================
 # PREP SPC DATA
 # =========================
-def prep_spc(df, north, south):
-    tmp = df.copy()
-    tmp["value"] = tmp[[north, south]].mean(axis=1)
-    return tmp.groupby("製造批號", as_index=False).agg(
-        Time=("Time", "min"),
-        value=("value", "mean")
-    )
-
 def prep_lab(df, col):
     return df.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
@@ -143,10 +124,11 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHART FUNCTIONS
+# SPC CHART
 # =========================
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
+
     mean = spc["value"].mean()
     std = spc["value"].std()
 
