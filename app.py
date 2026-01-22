@@ -70,7 +70,7 @@ df.columns = (
 )
 
 # =========================
-# SIDEBAR FILTER
+# SIDEBAR – FILTER
 # =========================
 st.sidebar.title("🎨 Filter")
 
@@ -97,26 +97,8 @@ df = df[df["Time"].dt.year == year]
 if month:
     df = df[df["Time"].dt.month.isin(month)]
 
-st.sidebar.divider()
-
 # =========================
-# LIMIT DISPLAY
-# =========================
-def show_limits(factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return
-    table = row.filter(like=factor).copy()
-    for c in table.columns:
-        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
-    st.sidebar.markdown(f"**{factor} Control Limits**")
-    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
-
-show_limits("LAB")
-show_limits("LINE")
-
-# =========================
-# LIMIT FUNCTION
+# LIMIT FUNCTIONS
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -149,19 +131,18 @@ def prep_lab(df, col):
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
-
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.axhline(mean + 3 * std, linestyle="--", color="orange")
+    ax.axhline(mean - 3 * std, linestyle="--", color="orange")
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+        ax.axhline(lab_lim[0], linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], linestyle=":", label="LAB UCL")
 
     if line_lim[0] is not None:
         ax.axhline(line_lim[0], color="red", label="LINE LCL")
@@ -176,13 +157,12 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
 
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
-
     mean = spc["value"].mean()
     std = spc["value"].std()
 
     ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.axhline(mean + 3 * std, linestyle="--", color="orange")
+    ax.axhline(mean - 3 * std, linestyle="--", color="orange")
 
     if limit[0] is not None:
         ax.axhline(limit[0], color="red", label="LCL")
@@ -195,34 +175,34 @@ def spc_single(spc, title, limit, color):
     fig.subplots_adjust(right=0.78)
     return fig
 
+# =========================
+# TIME RANGE DISPLAY (FINAL)
+# =========================
+def show_time_range(spc_df):
+    if "Time" not in spc_df.columns:
+        return
+
+    t = spc_df["Time"].dropna()
+    if t.empty:
+        return
+
+    n = spc_df["製造批號"].nunique()
+
+    st.markdown(
+        f"""
+        <div style="color:#6c757d;font-size:0.85rem;margin-top:-8px;">
+        ⏱ Time range: {t.min().strftime('%Y-%m-%d')} →
+        {t.max().strftime('%Y-%m-%d')} | n = {n} batches
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 def download(fig, name):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
     buf.seek(0)
     st.download_button("📥 Download PNG", buf, name, "image/png")
-
-# =========================
-# TIME RANGE + n BATCH (MARKDOWN)
-# =========================
-def show_time_range_from_spc(spc_df):
-    if "Time" not in spc_df.columns or "製造批號" not in spc_df.columns:
-        html = "⏱ Time range: N/A | n = 0 batches"
-    else:
-        t = spc_df["Time"].dropna()
-        n = spc_df["製造批號"].nunique()
-        if t.empty:
-            html = "⏱ Time range: N/A | n = 0 batches"
-        else:
-            html = (
-                f"⏱ Time range: {t.min().strftime('%Y-%m-%d')} → "
-                f"{t.max().strftime('%Y-%m-%d')} | "
-                f"n = {n} batches"
-            )
-
-    st.markdown(
-        f"<div style='color:#6c757d;font-size:0.85rem;'>{html}</div>",
-        unsafe_allow_html=True
-    )
 
 # =========================
 # PREP DATA
@@ -249,76 +229,44 @@ st.title(f"🎨 SPC Color Dashboard — {color}")
 
 st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE")
-    )
-    st.pyplot(fig)
-    show_time_range_from_spc(pd.concat([spc[k]["lab"], spc[k]["line"]]))
-    download(fig, f"COMBINED_{color}_{k}.png")
-
-st.markdown("---")
-
-st.markdown("### 🧪 LAB SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["lab"],
-        f"LAB {k}",
-        get_limit(color, k, "LAB"),
-        "#1f77b4"
-    )
-    st.pyplot(fig)
-    show_time_range_from_spc(spc[k]["lab"])
-    download(fig, f"LAB_{color}_{k}.png")
-
-st.markdown("---")
-
-st.markdown("### 🏭 LINE SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["line"],
-        f"LINE {k}",
-        get_limit(color, k, "LINE"),
-        "#2ca02c"
-    )
-    st.pyplot(fig)
-    show_time_range_from_spc(spc[k]["line"])
-    download(fig, f"LINE_{color}_{k}.png")
-
-# =========================
-# DISTRIBUTION DASHBOARD
-# =========================
-st.markdown("---")
-st.markdown("## 📈 Process Distribution Dashboard")
-
-def normal_pdf(x, mean, std):
-    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
-
-cols = st.columns(3)
-
-for i, k in enumerate(spc):
-    with cols[i]:
-        values = spc[k]["line"]["value"].dropna()
-        mean = values.mean()
-        std = values.std()
-        lcl, ucl = get_limit(color, k, "LINE")
-
-        fig, ax = plt.subplots(figsize=(4, 3))
-        bins = np.histogram_bin_edges(values, bins=10)
-        _, _, patches = ax.hist(values, bins=bins, edgecolor="white", color="#4dabf7")
-
-        for p, l, r in zip(patches, bins[:-1], bins[1:]):
-            c = (l + r) / 2
-            if lcl is not None and ucl is not None and (c < lcl or c > ucl):
-                p.set_facecolor("red")
-
-        x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
-        pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
-
-        ax.set_title(f"{k}")
-        ax.grid(axis="y", alpha=0.3)
+    with st.container():
+        fig = spc_combined(
+            spc[k]["lab"],
+            spc[k]["line"],
+            f"COMBINED {k}",
+            get_limit(color, k, "LAB"),
+            get_limit(color, k, "LINE")
+        )
         st.pyplot(fig)
+        show_time_range(pd.concat([spc[k]["lab"], spc[k]["line"]]))
+        download(fig, f"COMBINED_{color}_{k}.png")
+
+st.markdown("---")
+st.markdown("### 🧪 LAB SPC")
+
+for k in spc:
+    with st.container():
+        fig = spc_single(
+            spc[k]["lab"],
+            f"LAB {k}",
+            get_limit(color, k, "LAB"),
+            "#1f77b4"
+        )
+        st.pyplot(fig)
+        show_time_range(spc[k]["lab"])
+        download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
+st.markdown("### 🏭 LINE SPC")
+
+for k in spc:
+    with st.container():
+        fig = spc_single(
+            spc[k]["line"],
+            f"LINE {k}",
+            get_limit(color, k, "LINE"),
+            "#2ca02c"
+        )
+        st.pyplot(fig)
+        show_time_range(spc[k]["line"])
+        download(fig, f"LINE_{color}_{k}.png")
