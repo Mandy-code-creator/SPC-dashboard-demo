@@ -220,18 +220,17 @@ summary_line = []
 summary_lab = []
 
 for k in spc:
-    # ===== LINE =====
-    # ===== LINE =====
-line_df = spc[k]["line"]
+    # ================= LINE (theo BATCH) =================
+    line_df = spc[k]["line"].dropna(subset=["value"])
 
-line_values = line_df["mean"].dropna()
-line_mean = line_values.mean()
-line_std = line_values.std()
-line_n = line_values.count()
+    line_values = line_df["value"]
 
-line_min = line_df["min"].min()
-line_max = line_df["max"].max()
+    line_n = len(line_df)
+    line_mean = line_values.mean()
+    line_std = line_values.std(ddof=1)
 
+    line_min = line_values.min()
+    line_max = line_values.max()
 
     lcl, ucl = get_limit(color, k, "LINE")
 
@@ -246,15 +245,37 @@ line_max = line_df["max"].max()
 
     summary_line.append({
         "Factor": k,
-        "Min": round(line_min, 2),
-        "Max": round(line_max, 2),
-        "Mean": round(line_mean, 2),
-        "Std Dev": round(line_std, 2),
+        "Min": round(line_min, 3),
+        "Max": round(line_max, 3),
+        "Mean": round(line_mean, 3),
+        "Std Dev": round(line_std, 3),
         "Ca": round(ca, 2) if ca is not None else "",
         "Cp": round(cp, 2) if cp is not None else "",
         "Cpk": round(cpk, 2) if cpk is not None else "",
         "n": line_n
     })
+
+    # ================= LAB (theo BATCH) =================
+    lab_df = spc[k]["lab"].dropna(subset=["value"])
+
+    lab_values = lab_df["value"]
+
+    lab_n = len(lab_df)
+    lab_mean = lab_values.mean()
+    lab_std = lab_values.std(ddof=1)
+
+    lab_min = lab_values.min()
+    lab_max = lab_values.max()
+
+    summary_lab.append({
+        "Factor": k,
+        "Min": round(lab_min, 3),
+        "Max": round(lab_max, 3),
+        "Mean": round(lab_mean, 3),
+        "Std Dev": round(lab_std, 3),
+        "n": lab_n
+    })
+
 
     # ===== LAB =====
     lab_values = spc[k]["lab"]["value"].dropna()
@@ -485,6 +506,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
