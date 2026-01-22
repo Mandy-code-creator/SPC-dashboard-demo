@@ -21,20 +21,6 @@ if st.button("🔄 Refresh data"):
     st.cache_data.clear()
 
 # =========================
-# SIDEBAR STYLE
-# =========================
-st.markdown(
-    """
-    <style>
-    [data-testid="stSidebar"] {
-        background-color: #f6f8fa;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# =========================
 # GOOGLE SHEET LINKS
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
@@ -104,23 +90,7 @@ st.sidebar.divider()
 st.sidebar.markdown("## 📊 SPC Statistics")
 
 # =========================
-# LIMIT DISPLAY
-# =========================
-def show_limits(factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return
-    table = row.filter(like=factor).copy()
-    for c in table.columns:
-        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
-    st.sidebar.markdown(f"**{factor} Control Limits**")
-    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
-
-show_limits("LAB")
-show_limits("LINE")
-
-# =========================
-# LIMIT FUNCTION
+# LIMIT FUNCTIONS
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -149,7 +119,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS
+# SPC CHART FUNCTIONS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -199,14 +169,8 @@ def spc_single(spc, title, limit, color):
 
     return fig
 
-def download(fig, name):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
-    buf.seek(0)
-    st.download_button("📥 Download PNG", buf, name, "image/png")
-
 # =========================
-# PREP DATA
+# SPC DATA
 # =========================
 spc = {
     "ΔL": {
@@ -224,56 +188,29 @@ spc = {
 }
 
 # =========================
-# SIDEBAR MEAN & STD DISPLAY
+# SIDEBAR MEAN & STD
 # =========================
 for k in spc:
-    vals = spc[k]["line"]["value"]
-    st.sidebar.markdown(f"**{k}**  \nMean = {vals.mean():.3f}  \nStd = {vals.std():.3f}")
+    v = spc[k]["line"]["value"]
+    st.sidebar.markdown(f"**{k}**  \nMean = {v.mean():.3f}  \nStd = {v.std():.3f}")
 
 # =========================
-# MAIN – SPC CHARTS
+# MAIN SPC CHARTS
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
 st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE")
+    st.pyplot(
+        spc_combined(
+            spc[k]["lab"],
+            spc[k]["line"],
+            f"COMBINED {k}",
+            get_limit(color, k, "LAB"),
+            get_limit(color, k, "LINE")
+        )
     )
-    st.pyplot(fig)
-    download(fig, f"COMBINED_{color}_{k}.png")
 
-st.markdown("---")
-st.markdown("### 🧪 LAB SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["lab"],
-        f"LAB {k}",
-        get_limit(color, k, "LAB"),
-        "#1f77b4"
-    )
-    st.pyplot(fig)
-    download(fig, f"LAB_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 🏭 LINE SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["line"],
-        f"LINE {k}",
-        get_limit(color, k, "LINE"),
-        "#2ca02c"
-    )
-    st.pyplot(fig)
-    download(fig, f"LINE_{color}_{k}.png")
-
-# =========================
-# DISTRIBUTION DASHBOARD (MÀU ĐẸP HƠN)
-# =========================
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
 
@@ -291,24 +228,30 @@ for i, k in enumerate(spc):
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
-        _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
+        counts, _, patches = ax.hist(values, bins=bins, edgecolor="white")
 
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
             if c < lcl or c > ucl:
-                p.set_facecolor("#d62728")   # đỏ out-of-spec
+                p.set_facecolor("#d62728")   # out-of-spec
             else:
-                p.set_facecolor("#1f77b4")   # tím đẹp
+                p.set_facecolor("#1f77b4")   # in-spec
             p.set_alpha(0.85)
 
+        # ✅ NORMAL CURVE – BLACK
         x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
         pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="#0b3c5d")
+        ax.plot(
+            x,
+            pdf * len(values) * (bins[1] - bins[0]),
+            color="black",
+            linewidth=2
+        )
 
         cp = (ucl - lcl) / (6 * std)
         cpk = min(ucl - mean, mean - lcl) / (3 * std)
 
         ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}")
         ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
 
+        st.pyplot(fig)
