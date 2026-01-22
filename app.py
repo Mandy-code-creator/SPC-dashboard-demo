@@ -265,13 +265,17 @@ for k in spc:
         ca = abs(line_mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
 
     summary_line.append({
-        "Factor": k,
-        "Min": round(line_min, 2),
-        "Max": round(line_max, 2),
-        "Mean": round(line_mean, 2),
-        "Std Dev": round(line_std, 2),
-        "Ca": round(ca, 2) if ca is not None else "",
-        "Cp": round(cp, 2) if cp is not None els
+    "Factor": k,
+    "Min": round(line_min, 2),
+    "Max": round(line_max, 2),
+    "Mean": round(line_mean, 2),
+    "Std Dev": round(line_std, 2),
+    "Ca": round(ca, 2) if ca is not None else "",
+    "Cp": round(cp, 2) if cp is not None else "",
+    "Cpk": round(cpk, 2) if cpk is not None else "",
+    "n": line_n
+})
+
 
 
 summary_line_df = pd.DataFrame(summary_line)
@@ -485,6 +489,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
