@@ -144,12 +144,17 @@ show_limits("LINE")
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
+
     if row.empty:
         return None, None
-    return (
-        row.get(f"{factor} {prefix} LCL", [None]).values[0],
-        row.get(f"{factor} {prefix} UCL", [None]).values[0]
-    )
+
+    lcl_col = f"{factor} {prefix} LCL"
+    ucl_col = f"{factor} {prefix} UCL"
+
+    lcl = row[lcl_col].iloc[0] if lcl_col in row.columns else None
+    ucl = row[ucl_col].iloc[0] if ucl_col in row.columns else None
+
+    return lcl, ucl
 
 # =========================
 # PREP SPC DATA
@@ -472,6 +477,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
