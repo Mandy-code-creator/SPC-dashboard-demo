@@ -107,7 +107,12 @@ def show_limits(factor):
 
 show_limits("LAB")
 show_limits("LINE")
-
+# Refresh data
+# =========================
+if st.sidebar.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.experimental_rerun()
+# =========================
 # =========================
 # LIMIT FUNCTION
 # =========================
@@ -350,3 +355,4 @@ for i, k in enumerate(spc):
         ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
+
