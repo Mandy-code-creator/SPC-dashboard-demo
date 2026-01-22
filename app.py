@@ -63,7 +63,7 @@ df.columns = (
 )
 
 # =========================
-# SIDEBAR – REFRESH BUTTON (TOP)
+# SIDEBAR – REFRESH BUTTON
 # =========================
 if st.sidebar.button("🔄 Refresh data"):
     st.cache_data.clear()
@@ -116,6 +116,11 @@ show_limits("LAB")
 show_limits("LINE")
 
 # =========================
+# 🔹 CHANGED: SPC SUMMARY IN SIDEBAR (MEAN & STD ONLY)
+# =========================
+st.sidebar.markdown("## 📊 SPC Statistics")
+
+# =========================
 # LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
@@ -145,56 +150,51 @@ def prep_lab(df, col):
     )
 
 # =========================
-# LEGEND OUTSIDE
+# SPC CHARTS (GIỮ NGUYÊN)
 # =========================
-def finalize_legend(ax):
-    handles, labels = ax.get_legend_handles_labels()
-    uniq = dict(zip(labels, handles))
-    ax.legend(
-        uniq.values(),
-        uniq.keys(),
-        loc="center left",
-        bbox_to_anchor=(1.02, 0.5),
-        frameon=True,
-        fontsize=9
-    )
+def spc_combined(lab, line, title, lab_lim, line_lim):
+    fig, ax = plt.subplots(figsize=(12, 4))
 
-# =========================
-# SPC CHARTS
-# =========================
+    mean = line["value"].mean()
+    std = line["value"].std()
+
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
+
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
+
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red")
+        ax.axhline(line_lim[1], color="red")
+
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    return fig
+
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
-
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--")
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red", label="LCL")
-        ax.axhline(limit[1], color="red", label="UCL")
-
-        ooc = spc[(spc["value"] < limit[0]) | (spc["value"] > limit[1])]
-        ax.scatter(ooc["製造批號"], ooc["value"], color="red", zorder=5)
-
-        for _, r in ooc.iterrows():
-            ax.annotate(
-                r["製造批號"],
-                (r["製造批號"], r["value"]),
-                textcoords="offset points",
-                xytext=(0, 8),
-                ha="center",
-                fontsize=8,
-                color="red"
-            )
+        ax.axhline(limit[0], color="red")
+        ax.axhline(limit[1], color="red")
 
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    finalize_legend(ax)
     return fig
 
 def download(fig, name):
@@ -222,20 +222,45 @@ spc = {
 }
 
 # =========================
-# SIDEBAR – SPC SUMMARY
+# 🔹 CHANGED: FILL SIDEBAR STATS (NO CHART IMPACT)
 # =========================
-st.sidebar.markdown("## 📊 SPC Summary")
-
 for k in spc:
     values = spc[k]["line"]["value"].dropna()
     st.sidebar.markdown(f"### {k}")
-    st.sidebar.metric("Mean", f"{values.mean():.3f}")
-    st.sidebar.metric("Std (σ)", f"{values.std():.3f}")
+    st.sidebar.write(f"Mean: {values.mean():.3f}")
+    st.sidebar.write(f"Std (σ): {values.std():.3f}")
 
 # =========================
-# MAIN
+# MAIN – BIỂU ĐỒ GỐC
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
+
+st.markdown("### 📊 COMBINED SPC")
+for k in spc:
+    fig = spc_combined(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
+    )
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🧪 LAB SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["lab"],
+        f"LAB {k}",
+        get_limit(color, k, "LAB"),
+        "#1f77b4"
+    )
+    st.pyplot(fig)
+    download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
 
 st.markdown("### 🏭 LINE SPC")
 for k in spc:
@@ -249,7 +274,7 @@ for k in spc:
     download(fig, f"LINE_{color}_{k}.png")
 
 # =========================
-# DISTRIBUTION DASHBOARD
+# DISTRIBUTION DASHBOARD (GIỮ NGUYÊN)
 # =========================
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
@@ -267,7 +292,6 @@ for i, k in enumerate(spc):
         lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(4, 3))
-
         bins = np.histogram_bin_edges(values, bins=10)
         ax.hist(values, bins=bins, edgecolor="white")
 
@@ -275,6 +299,6 @@ for i, k in enumerate(spc):
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
-        ax.set_title(f"{k}")
+        ax.set_title(k)
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
