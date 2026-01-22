@@ -35,6 +35,12 @@ DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
 
 # =========================
+# REFRESH BUTTON
+# =========================
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
+
+# =========================
 # LOAD DATA
 # =========================
 @st.cache_data(ttl=300)
@@ -61,13 +67,6 @@ df.columns = (
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
-
-# =========================
-# SIDEBAR – REFRESH BUTTON
-# =========================
-if st.sidebar.button("🔄 Refresh data"):
-    st.cache_data.clear()
-    st.rerun()
 
 # =========================
 # SIDEBAR – FILTER
@@ -116,11 +115,6 @@ show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# SIDEBAR – SPC STATISTICS (MEAN / STD ONLY)
-# =========================
-st.sidebar.markdown("## 📊 SPC Statistics")
-
-# =========================
 # LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
@@ -150,7 +144,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS (GIỮ NGUYÊN + KHÔI PHỤC LEGEND)
+# SPC CHARTS (LEGEND NGOÀI)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -173,9 +167,15 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
         ax.axhline(line_lim[1], color="red", label="LINE UCL")
 
     ax.set_title(title)
-    ax.legend()
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
+
+    ax.legend(
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False
+    )
+
     return fig
 
 def spc_single(spc, title, limit, color):
@@ -185,6 +185,7 @@ def spc_single(spc, title, limit, color):
     std = spc["value"].std()
 
     ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
+
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
@@ -193,9 +194,15 @@ def spc_single(spc, title, limit, color):
         ax.axhline(limit[1], color="red", label="UCL")
 
     ax.set_title(title)
-    ax.legend()
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
+
+    ax.legend(
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False
+    )
+
     return fig
 
 def download(fig, name):
@@ -223,16 +230,7 @@ spc = {
 }
 
 # =========================
-# FILL SIDEBAR STATISTICS
-# =========================
-for k in spc:
-    v = spc[k]["line"]["value"].dropna()
-    st.sidebar.markdown(f"### {k}")
-    st.sidebar.write(f"Mean: {v.mean():.3f}")
-    st.sidebar.write(f"Std (σ): {v.std():.3f}")
-
-# =========================
-# MAIN – BIỂU ĐỒ GỐC
+# MAIN
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
@@ -273,32 +271,3 @@ for k in spc:
     )
     st.pyplot(fig)
     download(fig, f"LINE_{color}_{k}.png")
-
-# =========================
-# DISTRIBUTION DASHBOARD (GIỮ NGUYÊN)
-# =========================
-st.markdown("---")
-st.markdown("## 📈 Process Distribution Dashboard")
-
-def normal_pdf(x, mean, std):
-    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
-
-cols = st.columns(3)
-
-for i, k in enumerate(spc):
-    with cols[i]:
-        values = spc[k]["line"]["value"].dropna()
-        mean = values.mean()
-        std = values.std()
-
-        fig, ax = plt.subplots(figsize=(4, 3))
-        bins = np.histogram_bin_edges(values, bins=10)
-        ax.hist(values, bins=bins, edgecolor="white")
-
-        x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
-        pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
-
-        ax.set_title(k)
-        ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
