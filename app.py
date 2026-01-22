@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import io
 import numpy as np
 import math
 
@@ -14,16 +15,30 @@ st.set_page_config(
 )
 
 # =========================
-# REFRESH BUTTON (TOP)
+# SIDEBAR STYLE
 # =========================
-if st.button("🔄 Refresh data"):
-    st.cache_data.clear()
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #f6f8fa;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================
 # GOOGLE SHEET LINKS
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
+
+# =========================
+# REFRESH BUTTON (TOP)
+# =========================
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
 
 # =========================
 # LOAD DATA
@@ -84,9 +99,20 @@ if month:
 st.sidebar.divider()
 
 # =========================
-# SIDEBAR – MEAN & STD
+# LIMIT DISPLAY
 # =========================
-st.sidebar.markdown("## 📊 SPC Statistics")
+def show_limits(factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return
+    table = row.filter(like=factor).copy()
+    for c in table.columns:
+        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+    st.sidebar.markdown(f"**{factor} Control Limits**")
+    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
+
+show_limits("LAB")
+show_limits("LINE")
 
 # =========================
 # LIMIT FUNCTION
@@ -118,9 +144,11 @@ def prep_lab(df, col):
     )
 
 # =========================
-# TIME TEXTBOX
+# TIME BOX (⏱ FIX CLIP)
 # =========================
 def add_time_box(ax, spc_df):
+    if spc_df.empty:
+        return
     t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
     t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
 
@@ -130,6 +158,7 @@ def add_time_box(ax, spc_df):
         transform=ax.transAxes,
         fontsize=9,
         va="bottom",
+        clip_on=False,   # 🔥 QUAN TRỌNG
         bbox=dict(
             boxstyle="round,pad=0.35",
             fc="#f8f9fa",
@@ -138,7 +167,7 @@ def add_time_box(ax, spc_df):
     )
 
 # =========================
-# SPC CHART FUNCTIONS
+# SPC CHARTS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -147,15 +176,15 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.axhline(mean + 3 * std, linestyle="--", color="orange", label="+3σ")
+    ax.axhline(mean - 3 * std, linestyle="--", color="orange", label="-3σ")
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+        ax.axhline(lab_lim[0], linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], linestyle=":", label="LAB UCL")
 
     if line_lim[0] is not None:
         ax.axhline(line_lim[0], color="red", label="LINE LCL")
@@ -164,10 +193,9 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.6), frameon=False)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
 
     add_time_box(ax, line)
-
     return fig
 
 def spc_single(spc, title, limit, color):
@@ -178,8 +206,8 @@ def spc_single(spc, title, limit, color):
     std = spc["value"].std()
 
     ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.axhline(mean + 3 * std, linestyle="--", color="orange", label="+3σ")
+    ax.axhline(mean - 3 * std, linestyle="--", color="orange", label="-3σ")
 
     if limit[0] is not None:
         ax.axhline(limit[0], color="red", label="LCL")
@@ -188,14 +216,19 @@ def spc_single(spc, title, limit, color):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.6), frameon=False)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1))
 
     add_time_box(ax, spc)
-
     return fig
 
+def download(fig, name):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+    buf.seek(0)
+    st.download_button("📥 Download PNG", buf, name, "image/png")
+
 # =========================
-# SPC DATA
+# PREP DATA
 # =========================
 spc = {
     "ΔL": {
@@ -213,28 +246,21 @@ spc = {
 }
 
 # =========================
-# SIDEBAR MEAN & STD
-# =========================
-for k in spc:
-    v = spc[k]["line"]["value"]
-    st.sidebar.markdown(f"**{k}**  \nMean = {v.mean():.3f}  \nStd = {v.std():.3f}")
-
-# =========================
-# MAIN SPC
+# MAIN
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
 st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    st.pyplot(
-        spc_combined(
-            spc[k]["lab"],
-            spc[k]["line"],
-            f"COMBINED {k}",
-            get_limit(color, k, "LAB"),
-            get_limit(color, k, "LINE")
-        )
+    fig = spc_combined(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
     )
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
@@ -243,7 +269,6 @@ def normal_pdf(x, mean, std):
     return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
 
 cols = st.columns(3)
-
 for i, k in enumerate(spc):
     with cols[i]:
         values = spc[k]["line"]["value"].dropna()
@@ -253,21 +278,13 @@ for i, k in enumerate(spc):
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
-        _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
 
-        for p, l, r in zip(patches, bins[:-1], bins[1:]):
-            c = (l + r) / 2
-            p.set_facecolor("#1f77b4" if lcl <= c <= ucl else "#d62728")
-            p.set_alpha(0.85)
+        ax.hist(values, bins=bins, color="#4dabf7", edgecolor="white", alpha=0.85)
 
-        x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
+        x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
         pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black", linewidth=2)
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
-        cp = (ucl - lcl) / (6 * std)
-        cpk = min(ucl - mean, mean - lcl) / (3 * std)
-
-        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}")
+        ax.set_title(f"{k}")
         ax.grid(axis="y", alpha=0.3)
-
         st.pyplot(fig)
