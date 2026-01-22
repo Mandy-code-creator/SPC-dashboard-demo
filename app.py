@@ -276,4 +276,6 @@ with col1:
 
 with col2:
     st.markdown("#### 🧪 LAB")
-    st.data
+    st.dataframe(summary_lab_df, use_container_width=True, hide_index=True)
+
+
