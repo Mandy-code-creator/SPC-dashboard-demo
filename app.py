@@ -29,6 +29,15 @@ st.markdown(
 )
 
 # =========================
+# 🔄 REFRESH BUTTON (TOP)
+# =========================
+if st.sidebar.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
+
+st.sidebar.divider()
+
+# =========================
 # GOOGLE SHEET LINKS
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
@@ -107,12 +116,7 @@ def show_limits(factor):
 
 show_limits("LAB")
 show_limits("LINE")
-# Refresh data
-# =========================
-if st.sidebar.button("🔄 Refresh data"):
-    st.cache_data.clear()
-    st.experimental_rerun()
-# =========================
+
 # =========================
 # LIMIT FUNCTION
 # =========================
@@ -143,24 +147,20 @@ def prep_lab(df, col):
     )
 
 # =========================
-# OUT OF CONTROL + BATCH ID
+# OUT-OF-CONTROL + BATCH ID
 # =========================
 def mark_out_of_control(ax, x, y, mean, std, limit):
-    upper_3s = mean + 3 * std
-    lower_3s = mean - 3 * std
+    upper = mean + 3 * std
+    lower = mean - 3 * std
 
-    mask = (y > upper_3s) | (y < lower_3s)
-
+    mask = (y > upper) | (y < lower)
     if limit[0] is not None:
         mask |= (y < limit[0]) | (y > limit[1])
 
     ax.scatter(
-        x[mask],
-        y[mask],
-        s=90,
-        facecolors="none",
-        edgecolors="red",
-        linewidths=2,
+        x[mask], y[mask],
+        s=90, facecolors="none",
+        edgecolors="red", linewidths=2,
         label="Out of control"
     )
 
@@ -168,8 +168,8 @@ def mark_out_of_control(ax, x, y, mean, std, limit):
         ax.annotate(
             str(xi),
             (xi, yi),
-            textcoords="offset points",
             xytext=(0, 8),
+            textcoords="offset points",
             ha="center",
             fontsize=8,
             color="red",
@@ -180,9 +180,9 @@ def mark_out_of_control(ax, x, y, mean, std, limit):
 # LEGEND CLEAN
 # =========================
 def finalize_legend(ax):
-    handles, labels = ax.get_legend_handles_labels()
-    unique = dict(zip(labels, handles))
-    ax.legend(unique.values(), unique.keys())
+    h, l = ax.get_legend_handles_labels()
+    uniq = dict(zip(l, h))
+    ax.legend(uniq.values(), uniq.keys())
 
 # =========================
 # SPC CHARTS
@@ -355,4 +355,3 @@ for i, k in enumerate(spc):
         ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
-
