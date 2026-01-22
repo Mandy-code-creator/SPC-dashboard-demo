@@ -29,15 +29,6 @@ st.markdown(
 )
 
 # =========================
-# 🔄 REFRESH BUTTON (TOP)
-# =========================
-if st.sidebar.button("🔄 Refresh data"):
-    st.cache_data.clear()
-    st.rerun()
-
-st.sidebar.divider()
-
-# =========================
 # GOOGLE SHEET LINKS
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
@@ -70,6 +61,13 @@ df.columns = (
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
+
+# =========================
+# SIDEBAR – REFRESH BUTTON (TOP)
+# =========================
+if st.sidebar.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
 
 # =========================
 # SIDEBAR – FILTER
@@ -147,48 +145,16 @@ def prep_lab(df, col):
     )
 
 # =========================
-# OUT-OF-CONTROL + BATCH ID
-# =========================
-def mark_out_of_control(ax, x, y, mean, std, limit):
-    upper = mean + 3 * std
-    lower = mean - 3 * std
-
-    mask = (y > upper) | (y < lower)
-    if limit[0] is not None:
-        mask |= (y < limit[0]) | (y > limit[1])
-
-    ax.scatter(
-        x[mask], y[mask],
-        s=90, facecolors="none",
-        edgecolors="red", linewidths=2,
-        label="Out of control"
-    )
-
-    for xi, yi in zip(x[mask], y[mask]):
-        ax.annotate(
-            str(xi),
-            (xi, yi),
-            xytext=(0, 8),
-            textcoords="offset points",
-            ha="center",
-            fontsize=8,
-            color="red",
-            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1)
-        )
-
-# =========================
-# 🔧 LEGEND – NGOÀI BIỂU ĐỒ (CHỈ SỬA PHẦN NÀY)
+# LEGEND OUTSIDE
 # =========================
 def finalize_legend(ax):
     handles, labels = ax.get_legend_handles_labels()
-    unique = dict(zip(labels, handles))
-
+    uniq = dict(zip(labels, handles))
     ax.legend(
-        unique.values(),
-        unique.keys(),
+        uniq.values(),
+        uniq.keys(),
         loc="center left",
         bbox_to_anchor=(1.02, 0.5),
-        borderaxespad=0,
         frameon=True,
         fontsize=9
     )
@@ -196,44 +162,6 @@ def finalize_legend(ax):
 # =========================
 # SPC CHARTS
 # =========================
-def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    mean = line["value"].mean()
-    std = line["value"].std()
-
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
-
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
-
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="blue", linestyle=":", label="LAB LCL/UCL")
-        ax.axhline(lab_lim[1], color="blue", linestyle=":")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL/UCL")
-        ax.axhline(line_lim[1], color="red")
-
-    mark_out_of_control(ax, lab["製造批號"], lab["value"], mean, std, lab_lim)
-    mark_out_of_control(ax, line["製造批號"], line["value"], mean, std, line_lim)
-
-    ax.text(
-        1.01, 0.5,
-        f"Mean = {mean:.3f}\nStd = {std:.3f}",
-        transform=ax.transAxes,
-        va="center",
-        fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.8, edgecolor="none")
-    )
-
-    ax.set_title(title)
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    finalize_legend(ax)
-    return fig
-
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
@@ -246,19 +174,22 @@ def spc_single(spc, title, limit, color):
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red", label="LCL/UCL")
-        ax.axhline(limit[1], color="red")
+        ax.axhline(limit[0], color="red", label="LCL")
+        ax.axhline(limit[1], color="red", label="UCL")
 
-    mark_out_of_control(ax, spc["製造批號"], spc["value"], mean, std, limit)
+        ooc = spc[(spc["value"] < limit[0]) | (spc["value"] > limit[1])]
+        ax.scatter(ooc["製造批號"], ooc["value"], color="red", zorder=5)
 
-    ax.text(
-        1.01, 0.5,
-        f"Mean = {mean:.3f}\nStd = {std:.3f}",
-        transform=ax.transAxes,
-        va="center",
-        fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.8, edgecolor="none")
-    )
+        for _, r in ooc.iterrows():
+            ax.annotate(
+                r["製造批號"],
+                (r["製造批號"], r["value"]),
+                textcoords="offset points",
+                xytext=(0, 8),
+                ha="center",
+                fontsize=8,
+                color="red"
+            )
 
     ax.set_title(title)
     ax.grid(True)
@@ -291,35 +222,21 @@ spc = {
 }
 
 # =========================
+# SIDEBAR – SPC SUMMARY
+# =========================
+st.sidebar.markdown("## 📊 SPC Summary")
+
+for k in spc:
+    values = spc[k]["line"]["value"].dropna()
+    st.sidebar.markdown(f"### {k}")
+    st.sidebar.metric("Mean", f"{values.mean():.3f}")
+    st.sidebar.metric("Std (σ)", f"{values.std():.3f}")
+
+# =========================
 # MAIN
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
-st.markdown("### 📊 COMBINED SPC")
-for k in spc:
-    fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE")
-    )
-    st.pyplot(fig)
-    download(fig, f"COMBINED_{color}_{k}.png")
-
-st.markdown("---")
-st.markdown("### 🧪 LAB SPC")
-for k in spc:
-    fig = spc_single(
-        spc[k]["lab"],
-        f"LAB {k}",
-        get_limit(color, k, "LAB"),
-        "#1f77b4"
-    )
-    st.pyplot(fig)
-    download(fig, f"LAB_{color}_{k}.png")
-
-st.markdown("---")
 st.markdown("### 🏭 LINE SPC")
 for k in spc:
     fig = spc_single(
@@ -350,17 +267,14 @@ for i, k in enumerate(spc):
         lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(4, 3))
+
         bins = np.histogram_bin_edges(values, bins=10)
-        ax.hist(values, bins=bins, edgecolor="white", alpha=0.8)
+        ax.hist(values, bins=bins, edgecolor="white")
 
         x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
-        cp = (ucl - lcl) / (6 * std)
-        cpk = min(ucl - mean, mean - lcl) / (3 * std)
-        ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
-
-        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
+        ax.set_title(f"{k}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
