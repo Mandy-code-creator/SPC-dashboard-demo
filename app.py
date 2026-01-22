@@ -15,6 +15,12 @@ st.set_page_config(
 )
 
 # =========================
+# REFRESH BUTTON (TOP)
+# =========================
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
+
+# =========================
 # SIDEBAR STYLE
 # =========================
 st.markdown(
@@ -93,7 +99,12 @@ if month:
 st.sidebar.divider()
 
 # =========================
-# LIMIT DISPLAY (2 DECIMALS)
+# SIDEBAR – MEAN & STD
+# =========================
+st.sidebar.markdown("## 📊 SPC Statistics")
+
+# =========================
+# LIMIT DISPLAY
 # =========================
 def show_limits(factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -138,7 +149,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS (LOGIC GIỮ NGUYÊN)
+# SPC CHARTS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -163,8 +174,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-
-    # <<< CHỈNH: legend ra ngoài
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
 
     return fig
@@ -176,7 +185,6 @@ def spc_single(spc, title, limit, color):
     std = spc["value"].std()
 
     ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
-
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
@@ -187,8 +195,6 @@ def spc_single(spc, title, limit, color):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-
-    # <<< CHỈNH: legend ra ngoài
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
 
     return fig
@@ -200,7 +206,7 @@ def download(fig, name):
     st.download_button("📥 Download PNG", buf, name, "image/png")
 
 # =========================
-# PREP DATA (GIỮ NGUYÊN)
+# PREP DATA
 # =========================
 spc = {
     "ΔL": {
@@ -218,7 +224,14 @@ spc = {
 }
 
 # =========================
-# MAIN – BIỂU ĐỒ GỐC
+# SIDEBAR MEAN & STD DISPLAY
+# =========================
+for k in spc:
+    vals = spc[k]["line"]["value"]
+    st.sidebar.markdown(f"**{k}**  \nMean = {vals.mean():.3f}  \nStd = {vals.std():.3f}")
+
+# =========================
+# MAIN – SPC CHARTS
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
@@ -235,7 +248,6 @@ for k in spc:
     download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
-
 st.markdown("### 🧪 LAB SPC")
 for k in spc:
     fig = spc_single(
@@ -248,7 +260,6 @@ for k in spc:
     download(fig, f"LAB_{color}_{k}.png")
 
 st.markdown("---")
-
 st.markdown("### 🏭 LINE SPC")
 for k in spc:
     fig = spc_single(
@@ -261,7 +272,7 @@ for k in spc:
     download(fig, f"LINE_{color}_{k}.png")
 
 # =========================
-# DASHBOARD NHỎ – DISTRIBUTION (GIỮ NGUYÊN + KÉO ĐUÔI)
+# DISTRIBUTION DASHBOARD (MÀU ĐẸP HƠN)
 # =========================
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
@@ -277,7 +288,6 @@ for i, k in enumerate(spc):
         mean = values.mean()
         std = values.std()
         lcl, ucl = get_limit(color, k, "LINE")
-        center = (ucl + lcl) / 2 if lcl is not None else None
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
@@ -285,18 +295,19 @@ for i, k in enumerate(spc):
 
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
-            p.set_facecolor("red" if lcl and (c < lcl or c > ucl) else "#6f42c1")
-            p.set_alpha(0.8)
+            if c < lcl or c > ucl:
+                p.set_facecolor("#dc3545")   # đỏ out-of-spec
+            else:
+                p.set_facecolor("#6f42c1")   # tím đẹp
+            p.set_alpha(0.85)
 
-        # <<< CHỈNH: kéo đuôi normal curve
         x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
         pdf = normal_pdf(x, mean, std)
-        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="#212529")
 
         cp = (ucl - lcl) / (6 * std)
         cpk = min(ucl - mean, mean - lcl) / (3 * std)
-        ca = abs(mean - center) / ((ucl - lcl) / 2)
 
-        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
+        ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
