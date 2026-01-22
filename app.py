@@ -121,6 +121,23 @@ def prep_lab(df, col):
 # =========================
 # SPC CHART FUNCTIONS
 # =========================
+def add_time_box(ax, spc_df):
+    t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
+    t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
+
+    ax.text(
+        1.02, 0.02,
+        f"Time range:\n{t_min} → {t_max}",
+        transform=ax.transAxes,
+        fontsize=9,
+        va="bottom",
+        bbox=dict(
+            boxstyle="round,pad=0.3",
+            fc="#f8f9fa",
+            ec="#ced4da"
+        )
+    )
+
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
 
@@ -144,7 +161,9 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.6), frameon=False)
+
+    add_time_box(ax, line)
 
     return fig
 
@@ -165,7 +184,9 @@ def spc_single(spc, title, limit, color):
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.6), frameon=False)
+
+    add_time_box(ax, spc)
 
     return fig
 
@@ -228,25 +249,16 @@ for i, k in enumerate(spc):
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
-        counts, _, patches = ax.hist(values, bins=bins, edgecolor="white")
+        _, _, patches = ax.hist(values, bins=bins, edgecolor="white")
 
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
-            if c < lcl or c > ucl:
-                p.set_facecolor("#d62728")   # out-of-spec
-            else:
-                p.set_facecolor("#1f77b4")   # in-spec
+            p.set_facecolor("#1f77b4" if lcl <= c <= ucl else "#d62728")
             p.set_alpha(0.85)
 
-        # ✅ NORMAL CURVE – BLACK
         x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
         pdf = normal_pdf(x, mean, std)
-        ax.plot(
-            x,
-            pdf * len(values) * (bins[1] - bins[0]),
-            color="black",
-            linewidth=2
-        )
+        ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black", linewidth=2)
 
         cp = (ucl - lcl) / (6 * std)
         cpk = min(ucl - mean, mean - lcl) / (3 * std)
