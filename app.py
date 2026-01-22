@@ -6,11 +6,20 @@ import numpy as np
 import math
 
 # =========================
+# SPC COLOR THEME (INDUSTRIAL)
+# =========================
+LAB_COLOR    = "#1f77b4"   # Steel Blue (LAB)
+LINE_COLOR   = "#2ca02c"   # Process Green (LINE)
+LIMIT_COLOR  = "#d62728"   # Control Red (LCL / UCL)
+SIGMA_COLOR  = "#ff7f0e"   # Sigma Orange (±3σ)
+GRID_COLOR   = "#e0e0e0"
+
+# =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="SPC Color Dashboard",
-    page_icon="🎨",
+    page_title="SPC Coating Dashboard",
+    page_icon="🏭",
     layout="wide"
 )
 
@@ -72,7 +81,7 @@ df.columns = (
 # =========================
 # SIDEBAR – FILTER
 # =========================
-st.sidebar.title("🎨 Filter")
+st.sidebar.title("🏭 Process Filter")
 
 color = st.sidebar.selectbox(
     "Color code",
@@ -98,7 +107,7 @@ if month:
     df = df[df["Time"].dt.month.isin(month)]
 
 # =========================
-# LIMIT FUNCTIONS
+# LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -127,82 +136,80 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHART FUNCTIONS
+# TIME RANGE TEXT
 # =========================
-def spc_combined(lab, line, title, lab_lim, line_lim):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    mean = line["value"].mean()
-    std = line["value"].std()
-
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
-
-    ax.axhline(mean + 3 * std, linestyle="--", color="orange")
-    ax.axhline(mean - 3 * std, linestyle="--", color="orange")
-
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], linestyle=":", label="LAB UCL")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-    return fig
-
-def spc_single(spc, title, limit, color):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    mean = spc["value"].mean()
-    std = spc["value"].std()
-
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-    ax.axhline(mean + 3 * std, linestyle="--", color="orange")
-    ax.axhline(mean - 3 * std, linestyle="--", color="orange")
-
-    if limit[0] is not None:
-        ax.axhline(limit[0], color="red", label="LCL")
-        ax.axhline(limit[1], color="red", label="UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-    return fig
-
-# =========================
-# TIME RANGE DISPLAY (FINAL)
-# =========================
-def show_time_range(spc_df):
+def build_time_range_text(spc_df):
     if "Time" not in spc_df.columns:
-        return
+        return "⏱ N/A | n = 0 batches"
 
     t = spc_df["Time"].dropna()
     if t.empty:
-        return
+        return "⏱ N/A | n = 0 batches"
 
     n = spc_df["製造批號"].nunique()
-
-    st.markdown(
-        f"""
-        <div style="color:#6c757d;font-size:0.85rem;margin-top:-8px;">
-        ⏱ Time range: {t.min().strftime('%Y-%m-%d')} →
-        {t.max().strftime('%Y-%m-%d')} | n = {n} batches
-        </div>
-        """,
-        unsafe_allow_html=True
+    return (
+        f"⏱ {t.min().strftime('%Y-%m-%d')} → "
+        f"{t.max().strftime('%Y-%m-%d')} | "
+        f"n = {n} batches"
     )
+
+# =========================
+# SPC CHARTS
+# =========================
+def spc_combined(lab, line, title, lab_lim, line_lim):
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    mean = line["value"].mean()
+    std = line["value"].std()
+
+    ax.plot(lab["製造批號"], lab["value"], "o-", color=LAB_COLOR, label="LAB")
+    ax.plot(line["製造批號"], line["value"], "o-", color=LINE_COLOR, label="LINE")
+
+    ax.axhline(mean + 3 * std, linestyle="--", color=SIGMA_COLOR, label="+3σ")
+    ax.axhline(mean - 3 * std, linestyle="--", color=SIGMA_COLOR, label="-3σ")
+
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], linestyle=":", color=LAB_COLOR, label="LAB LCL")
+        ax.axhline(lab_lim[1], linestyle=":", color=LAB_COLOR, label="LAB UCL")
+
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color=LIMIT_COLOR, label="LINE LCL")
+        ax.axhline(line_lim[1], color=LIMIT_COLOR, label="LINE UCL")
+
+    ax.set_title(title, loc="left", fontsize=11)
+    ax.grid(True, color=GRID_COLOR)
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.subplots_adjust(right=0.78)
+    return fig
+
+def spc_single(spc, title, limit, series_color):
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    mean = spc["value"].mean()
+    std = spc["value"].std()
+
+    ax.plot(spc["製造批號"], spc["value"], "o-", color=series_color)
+
+    ax.axhline(mean + 3 * std, linestyle="--", color=SIGMA_COLOR, label="+3σ")
+    ax.axhline(mean - 3 * std, linestyle="--", color=SIGMA_COLOR, label="-3σ")
+
+    if limit[0] is not None:
+        ax.axhline(limit[0], color=LIMIT_COLOR, label="LCL")
+        ax.axhline(limit[1], color=LIMIT_COLOR, label="UCL")
+
+    ax.set_title(title, loc="left", fontsize=11)
+    ax.grid(True, color=GRID_COLOR)
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.subplots_adjust(right=0.78)
+    return fig
 
 def download(fig, name):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
     buf.seek(0)
-    st.download_button("📥 Download PNG", buf, name, "image/png")
+    st.download_button("⬇️ Export PNG", buf, name, "image/png")
 
 # =========================
 # PREP DATA
@@ -225,48 +232,45 @@ spc = {
 # =========================
 # MAIN DASHBOARD
 # =========================
-st.title(f"🎨 SPC Color Dashboard — {color}")
+st.title(f"🏭 SPC Coating Dashboard — {color}")
 
 st.markdown("### 📊 COMBINED SPC")
 for k in spc:
-    with st.container():
-        fig = spc_combined(
-            spc[k]["lab"],
-            spc[k]["line"],
-            f"COMBINED {k}",
-            get_limit(color, k, "LAB"),
-            get_limit(color, k, "LINE")
-        )
-        st.pyplot(fig)
-        show_time_range(pd.concat([spc[k]["lab"], spc[k]["line"]]))
-        download(fig, f"COMBINED_{color}_{k}.png")
+    time_text = build_time_range_text(
+        pd.concat([spc[k]["lab"], spc[k]["line"]])
+    )
+    fig = spc_combined(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}\n{time_text}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE")
+    )
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
 st.markdown("### 🧪 LAB SPC")
-
 for k in spc:
-    with st.container():
-        fig = spc_single(
-            spc[k]["lab"],
-            f"LAB {k}",
-            get_limit(color, k, "LAB"),
-            "#1f77b4"
-        )
-        st.pyplot(fig)
-        show_time_range(spc[k]["lab"])
-        download(fig, f"LAB_{color}_{k}.png")
+    time_text = build_time_range_text(spc[k]["lab"])
+    fig = spc_single(
+        spc[k]["lab"],
+        f"LAB {k}\n{time_text}",
+        get_limit(color, k, "LAB"),
+        LAB_COLOR
+    )
+    st.pyplot(fig)
+    download(fig, f"LAB_{color}_{k}.png")
 
 st.markdown("---")
 st.markdown("### 🏭 LINE SPC")
-
 for k in spc:
-    with st.container():
-        fig = spc_single(
-            spc[k]["line"],
-            f"LINE {k}",
-            get_limit(color, k, "LINE"),
-            "#2ca02c"
-        )
-        st.pyplot(fig)
-        show_time_range(spc[k]["line"])
-        download(fig, f"LINE_{color}_{k}.png")
+    time_text = build_time_range_text(spc[k]["line"])
+    fig = spc_single(
+        spc[k]["line"],
+        f"LINE {k}\n{time_text}",
+        get_limit(color, k, "LINE"),
+        LINE_COLOR
+    )
+    st.pyplot(fig)
+    download(fig, f"LINE_{color}_{k}.png")
