@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # =========================
-# REFRESH BUTTON (TOP)
+# REFRESH BUTTON
 # =========================
 if st.button("🔄 Refresh data"):
     st.cache_data.clear()
@@ -47,7 +47,7 @@ LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK
 @st.cache_data(ttl=300)
 def load_data():
     df = pd.read_csv(DATA_URL)
-    df["Time"] = pd.to_datetime(df["Time"])
+    df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
     return df
 
 @st.cache_data(ttl=300)
@@ -70,7 +70,7 @@ df.columns = (
 )
 
 # =========================
-# SIDEBAR – FILTER
+# SIDEBAR FILTER
 # =========================
 st.sidebar.title("🎨 Filter")
 
@@ -84,13 +84,13 @@ df = df[df["塗料編號"] == color]
 latest_year = df["Time"].dt.year.max()
 year = st.sidebar.selectbox(
     "Year",
-    sorted(df["Time"].dt.year.unique()),
-    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+    sorted(df["Time"].dt.year.dropna().unique()),
+    index=list(sorted(df["Time"].dt.year.dropna().unique())).index(latest_year)
 )
 
 month = st.sidebar.multiselect(
     "Month (optional)",
-    sorted(df["Time"].dt.month.unique())
+    sorted(df["Time"].dt.month.dropna().unique())
 )
 
 df = df[df["Time"].dt.year == year]
@@ -145,7 +145,7 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS
+# SPC CHART FUNCTIONS
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -202,15 +202,21 @@ def download(fig, name):
     st.download_button("📥 Download PNG", buf, name, "image/png")
 
 # =========================
-# TIME RANGE (THEO SPC DATA)
+# TIME RANGE (FAIL-SAFE)
 # =========================
 def show_time_range_from_spc(spc_df):
-    if spc_df.empty:
+    if "Time" not in spc_df.columns:
         st.caption("⏱ Time range: N/A")
         return
-    t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
-    t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
-    st.caption(f"⏱ Time range: **{t_min} → {t_max}**")
+
+    t = spc_df["Time"].dropna()
+    if t.empty:
+        st.caption("⏱ Time range: N/A")
+        return
+
+    st.caption(
+        f"⏱ Time range: **{t.min().strftime('%Y-%m-%d')} → {t.max().strftime('%Y-%m-%d')}**"
+    )
 
 # =========================
 # PREP DATA
@@ -245,9 +251,7 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
-    show_time_range_from_spc(
-        pd.concat([spc[k]["lab"], spc[k]["line"]])
-    )
+    show_time_range_from_spc(pd.concat([spc[k]["lab"], spc[k]["line"]]))
     download(fig, f"COMBINED_{color}_{k}.png")
 
 st.markdown("---")
