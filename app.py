@@ -202,20 +202,26 @@ def download(fig, name):
     st.download_button("📥 Download PNG", buf, name, "image/png")
 
 # =========================
-# TIME RANGE (FAIL-SAFE)
+# TIME RANGE + n BATCH (MARKDOWN)
 # =========================
 def show_time_range_from_spc(spc_df):
-    if "Time" not in spc_df.columns:
-        st.caption("⏱ Time range: N/A")
-        return
+    if "Time" not in spc_df.columns or "製造批號" not in spc_df.columns:
+        html = "⏱ Time range: N/A | n = 0 batches"
+    else:
+        t = spc_df["Time"].dropna()
+        n = spc_df["製造批號"].nunique()
+        if t.empty:
+            html = "⏱ Time range: N/A | n = 0 batches"
+        else:
+            html = (
+                f"⏱ Time range: {t.min().strftime('%Y-%m-%d')} → "
+                f"{t.max().strftime('%Y-%m-%d')} | "
+                f"n = {n} batches"
+            )
 
-    t = spc_df["Time"].dropna()
-    if t.empty:
-        st.caption("⏱ Time range: N/A")
-        return
-
-    st.caption(
-        f"⏱ Time range: **{t.min().strftime('%Y-%m-%d')} → {t.max().strftime('%Y-%m-%d')}**"
+    st.markdown(
+        f"<div style='color:#6c757d;font-size:0.85rem;'>{html}</div>",
+        unsafe_allow_html=True
     )
 
 # =========================
