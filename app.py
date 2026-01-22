@@ -15,6 +15,13 @@ st.set_page_config(
 )
 
 # =========================
+# REFRESH BUTTON (TOP)
+# =========================
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
+
+# =========================
 # SIDEBAR STYLE
 # =========================
 st.markdown(
@@ -33,12 +40,6 @@ st.markdown(
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
-
-# =========================
-# REFRESH BUTTON (TOP)
-# =========================
-if st.button("🔄 Refresh data"):
-    st.cache_data.clear()
 
 # =========================
 # LOAD DATA
@@ -122,8 +123,8 @@ def get_limit(color, prefix, factor):
     if row.empty:
         return None, None
     return (
-        row[f"{factor} {prefix} LCL"].values[0],
-        row[f"{factor} {prefix} UCL"].values[0]
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
 
 # =========================
@@ -144,16 +145,6 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SHOW TIME RANGE (STREAMLIT UI)
-# =========================
-def show_time_range(spc_df):
-    if spc_df.empty:
-        return
-    t_min = spc_df["Time"].min().strftime("%Y-%m-%d")
-    t_max = spc_df["Time"].max().strftime("%Y-%m-%d")
-    st.caption(f"⏱ Time range: **{t_min} → {t_max}**")
-
-# =========================
 # SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim):
@@ -162,25 +153,25 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE")
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
 
-    ax.axhline(mean + 3 * std, linestyle="--", color="orange", label="+3σ")
-    ax.axhline(mean - 3 * std, linestyle="--", color="orange", label="-3σ")
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], linestyle=":", label="LAB UCL")
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
 
     if line_lim[0] is not None:
         ax.axhline(line_lim[0], color="red", label="LINE LCL")
         ax.axhline(line_lim[1], color="red", label="LINE UCL")
 
     ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend()
-
+    fig.subplots_adjust(right=0.78)
     return fig
 
 def spc_single(spc, title, limit, color):
@@ -189,19 +180,19 @@ def spc_single(spc, title, limit, color):
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color, label="Value")
-    ax.axhline(mean + 3 * std, linestyle="--", color="orange", label="+3σ")
-    ax.axhline(mean - 3 * std, linestyle="--", color="orange", label="-3σ")
+    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
     if limit[0] is not None:
         ax.axhline(limit[0], color="red", label="LCL")
         ax.axhline(limit[1], color="red", label="UCL")
 
     ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend()
-
+    fig.subplots_adjust(right=0.78)
     return fig
 
 def download(fig, name):
@@ -209,6 +200,17 @@ def download(fig, name):
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
     buf.seek(0)
     st.download_button("📥 Download PNG", buf, name, "image/png")
+
+# =========================
+# TIME RANGE (CHẮC CHẮN HIỂN THỊ)
+# =========================
+def show_time_range_from_df(df):
+    if df.empty:
+        st.caption("⏱ Time range: N/A")
+        return
+    t_min = df["Time"].min().strftime("%Y-%m-%d")
+    t_max = df["Time"].max().strftime("%Y-%m-%d")
+    st.caption(f"⏱ Time range: **{t_min} → {t_max}**")
 
 # =========================
 # PREP DATA
@@ -229,7 +231,7 @@ spc = {
 }
 
 # =========================
-# MAIN
+# MAIN DASHBOARD
 # =========================
 st.title(f"🎨 SPC Color Dashboard — {color}")
 
@@ -243,9 +245,40 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
-    show_time_range(spc[k]["line"])
+    show_time_range_from_df(df)
     download(fig, f"COMBINED_{color}_{k}.png")
 
+st.markdown("---")
+
+st.markdown("### 🧪 LAB SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["lab"],
+        f"LAB {k}",
+        get_limit(color, k, "LAB"),
+        "#1f77b4"
+    )
+    st.pyplot(fig)
+    show_time_range_from_df(df)
+    download(fig, f"LAB_{color}_{k}.png")
+
+st.markdown("---")
+
+st.markdown("### 🏭 LINE SPC")
+for k in spc:
+    fig = spc_single(
+        spc[k]["line"],
+        f"LINE {k}",
+        get_limit(color, k, "LINE"),
+        "#2ca02c"
+    )
+    st.pyplot(fig)
+    show_time_range_from_df(df)
+    download(fig, f"LINE_{color}_{k}.png")
+
+# =========================
+# DISTRIBUTION DASHBOARD
+# =========================
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
 
@@ -253,6 +286,7 @@ def normal_pdf(x, mean, std):
     return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
 
 cols = st.columns(3)
+
 for i, k in enumerate(spc):
     with cols[i]:
         values = spc[k]["line"]["value"].dropna()
@@ -262,23 +296,17 @@ for i, k in enumerate(spc):
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
-        _, _, patches = ax.hist(
-            values,
-            bins=bins,
-            edgecolor="white",
-            alpha=0.85,
-            color="#4dabf7"
-        )
+        _, _, patches = ax.hist(values, bins=bins, edgecolor="white", color="#4dabf7")
 
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             c = (l + r) / 2
             if lcl is not None and ucl is not None and (c < lcl or c > ucl):
                 p.set_facecolor("red")
 
-        x = np.linspace(mean - 3 * std, mean + 3 * std, 400)
+        x = np.linspace(mean - 3*std, mean + 3*std, 300)
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
-        ax.set_title(k)
+        ax.set_title(f"{k}")
         ax.grid(axis="y", alpha=0.3)
         st.pyplot(fig)
