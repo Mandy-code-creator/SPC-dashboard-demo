@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import numpy as np
 import math
-st.write("✅ FILE LOADED AT:", __file__)
+
 # =========================
 # PAGE CONFIG
 # =========================
@@ -183,4 +183,5 @@ for k, spc_df in spc.items():
     )
     st.pyplot(fig)
     download(fig, f"LAB_{color}_{k}.png")
+
 
