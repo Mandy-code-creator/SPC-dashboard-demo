@@ -287,52 +287,62 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     std = line["value"].std()
 
     # ===== LAB =====
+    ax.plot(
+        lab["製造批號"],
+        lab["value"],
+        linestyle="-",
+        marker="o",
+        color="#1f77b4",
+        label="LAB"
+    )
+
     for _, r in lab.iterrows():
-        out = False
         if lab_lim[0] is not None and lab_lim[1] is not None:
-            out = r["value"] < lab_lim[0] or r["value"] > lab_lim[1]
-
-        ax.plot(
-            r["製造批號"],
-            r["value"],
-            marker="o",
-            color="red" if out else "#1f77b4"
-        )
-
-        if out:
-            ax.text(
-                r["製造批號"],
-                r["value"],
-                f'{r["製造批號"]}\n{r["value"]:.2f}',
-                color="red",
-                fontsize=8,
-                ha="center",
-                va="bottom"
-            )
+            if r["value"] < lab_lim[0] or r["value"] > lab_lim[1]:
+                ax.plot(
+                    r["製造批號"],
+                    r["value"],
+                    marker="o",
+                    color="red"
+                )
+                ax.text(
+                    r["製造批號"],
+                    r["value"],
+                    f'{r["製造批號"]}\n{r["value"]:.2f}',
+                    color="red",
+                    fontsize=8,
+                    ha="center",
+                    va="bottom"
+                )
 
     # ===== LINE =====
+    ax.plot(
+        line["製造批號"],
+        line["value"],
+        linestyle="-",
+        marker="s",
+        color="#2ca02c",
+        label="LINE"
+    )
+
     for _, r in line.iterrows():
-        out = False
         if line_lim[0] is not None and line_lim[1] is not None:
-            out = r["value"] < line_lim[0] or r["value"] > line_lim[1]
-
-        ax.plot(
-            r["製造批號"],
-            r["value"],
-            marker="s",          # marker khác LAB
-            color="red" if out else "#2ca02c"
-        )
-
-        if out:
-            ax.text(
-                r["製造批號"],
-                r["value"],
-                f'{r["製造批號"]}\n{r["value"]:.2f}',
-                color="red",
-                fontsize=8,
-                ha="center",
-                va="top"
-            )
+            if r["value"] < line_lim[0] or r["value"] > line_lim[1]:
+                ax.plot(
+                    r["製造批號"],
+                    r["value"],
+                    marker="s",
+                    color="red"
+                )
+                ax.text(
+                    r["製造批號"],
+                    r["value"],
+                    f'{r["製造批號"]}\n{r["value"]:.2f}',
+                    color="red",
+                    fontsize=8,
+                    ha="center",
+                    va="top"
+                )
 
     # ===== 3σ =====
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
@@ -519,5 +529,6 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
