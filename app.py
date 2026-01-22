@@ -3,15 +3,33 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import numpy as np
-import math
+
+# =========================
+# FORCE MATPLOTLIB STYLE (VERY IMPORTANT)
+# =========================
+plt.rcParams.update({
+    "axes.facecolor": "white",
+    "figure.facecolor": "white",
+    "axes.edgecolor": "#cccccc",
+    "axes.labelcolor": "#333333",
+    "xtick.color": "#333333",
+    "ytick.color": "#333333",
+    "grid.color": "#e0e0e0",
+    "grid.linestyle": "-",
+    "grid.linewidth": 0.8,
+    "axes.grid": True,
+    "legend.frameon": False,
+    "lines.linewidth": 2.5,
+    "lines.markersize": 6
+})
 
 # =========================
 # SPC COLOR THEME (INDUSTRIAL)
 # =========================
-LAB_COLOR    = "#1f77b4"   # Steel Blue (LAB)
-LINE_COLOR   = "#2ca02c"   # Process Green (LINE)
-LIMIT_COLOR  = "#d62728"   # Control Red (LCL / UCL)
-SIGMA_COLOR  = "#ff7f0e"   # Sigma Orange (±3σ)
+LAB_COLOR    = "#1f77b4"   # Steel Blue
+LINE_COLOR   = "#2ca02c"   # Process Green
+LIMIT_COLOR  = "#d62728"   # Control Red
+SIGMA_COLOR  = "#ff7f0e"   # Sigma Orange
 GRID_COLOR   = "#e0e0e0"
 
 # =========================
@@ -24,9 +42,9 @@ st.set_page_config(
 )
 
 # =========================
-# REFRESH BUTTON
+# HARD REFRESH BUTTON
 # =========================
-if st.button("🔄 Refresh data"):
+if st.button("🔄 HARD Refresh (Clear Cache)"):
     st.cache_data.clear()
     st.rerun()
 
@@ -45,7 +63,7 @@ st.markdown(
 )
 
 # =========================
-# GOOGLE SHEET LINKS
+# DATA SOURCES
 # =========================
 DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
 LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
@@ -67,7 +85,7 @@ df = load_data()
 limit_df = load_limit()
 
 # =========================
-# FIX COLUMN NAMES
+# CLEAN COLUMN NAMES
 # =========================
 df.columns = (
     df.columns
@@ -79,7 +97,7 @@ df.columns = (
 )
 
 # =========================
-# SIDEBAR – FILTER
+# SIDEBAR FILTER
 # =========================
 st.sidebar.title("🏭 Process Filter")
 
@@ -139,18 +157,13 @@ def prep_lab(df, col):
 # TIME RANGE TEXT
 # =========================
 def build_time_range_text(spc_df):
-    if "Time" not in spc_df.columns:
-        return "⏱ N/A | n = 0 batches"
-
     t = spc_df["Time"].dropna()
     if t.empty:
         return "⏱ N/A | n = 0 batches"
-
-    n = spc_df["製造批號"].nunique()
     return (
         f"⏱ {t.min().strftime('%Y-%m-%d')} → "
         f"{t.max().strftime('%Y-%m-%d')} | "
-        f"n = {n} batches"
+        f"n = {spc_df['製造批號'].nunique()}"
     )
 
 # =========================
@@ -162,44 +175,45 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", color=LAB_COLOR, label="LAB")
-    ax.plot(line["製造批號"], line["value"], "o-", color=LINE_COLOR, label="LINE")
+    ax.plot(lab["製造批號"], lab["value"],
+            color=LAB_COLOR, marker="o", label="LAB")
+    ax.plot(line["製造批號"], line["value"],
+            color=LINE_COLOR, marker="o", label="LINE")
 
-    ax.axhline(mean + 3 * std, linestyle="--", color=SIGMA_COLOR, label="+3σ")
-    ax.axhline(mean - 3 * std, linestyle="--", color=SIGMA_COLOR, label="-3σ")
+    ax.axhline(mean + 3*std, color=SIGMA_COLOR, linestyle="--", linewidth=2)
+    ax.axhline(mean - 3*std, color=SIGMA_COLOR, linestyle="--", linewidth=2)
 
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], linestyle=":", color=LAB_COLOR, label="LAB LCL")
-        ax.axhline(lab_lim[1], linestyle=":", color=LAB_COLOR, label="LAB UCL")
+        ax.axhline(lab_lim[0], color=LAB_COLOR, linestyle=":", linewidth=2)
+        ax.axhline(lab_lim[1], color=LAB_COLOR, linestyle=":", linewidth=2)
 
     if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color=LIMIT_COLOR, label="LINE LCL")
-        ax.axhline(line_lim[1], color=LIMIT_COLOR, label="LINE UCL")
+        ax.axhline(line_lim[0], color=LIMIT_COLOR, linestyle=":", linewidth=2.5)
+        ax.axhline(line_lim[1], color=LIMIT_COLOR, linestyle=":", linewidth=2.5)
 
     ax.set_title(title, loc="left", fontsize=11)
-    ax.grid(True, color=GRID_COLOR)
     ax.tick_params(axis="x", rotation=45)
     ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.subplots_adjust(right=0.78)
     return fig
 
-def spc_single(spc, title, limit, series_color):
+def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
     mean = spc["value"].mean()
     std = spc["value"].std()
 
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=series_color)
+    ax.plot(spc["製造批號"], spc["value"],
+            color=color, marker="o")
 
-    ax.axhline(mean + 3 * std, linestyle="--", color=SIGMA_COLOR, label="+3σ")
-    ax.axhline(mean - 3 * std, linestyle="--", color=SIGMA_COLOR, label="-3σ")
+    ax.axhline(mean + 3*std, color=SIGMA_COLOR, linestyle="--", linewidth=2)
+    ax.axhline(mean - 3*std, color=SIGMA_COLOR, linestyle="--", linewidth=2)
 
     if limit[0] is not None:
-        ax.axhline(limit[0], color=LIMIT_COLOR, label="LCL")
-        ax.axhline(limit[1], color=LIMIT_COLOR, label="UCL")
+        ax.axhline(limit[0], color=LIMIT_COLOR, linestyle=":", linewidth=2.5)
+        ax.axhline(limit[1], color=LIMIT_COLOR, linestyle=":", linewidth=2.5)
 
     ax.set_title(title, loc="left", fontsize=11)
-    ax.grid(True, color=GRID_COLOR)
     ax.tick_params(axis="x", rotation=45)
     ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.subplots_adjust(right=0.78)
@@ -252,10 +266,9 @@ for k in spc:
 st.markdown("---")
 st.markdown("### 🧪 LAB SPC")
 for k in spc:
-    time_text = build_time_range_text(spc[k]["lab"])
     fig = spc_single(
         spc[k]["lab"],
-        f"LAB {k}\n{time_text}",
+        f"LAB {k}\n{build_time_range_text(spc[k]['lab'])}",
         get_limit(color, k, "LAB"),
         LAB_COLOR
     )
@@ -265,10 +278,9 @@ for k in spc:
 st.markdown("---")
 st.markdown("### 🏭 LINE SPC")
 for k in spc:
-    time_text = build_time_range_text(spc[k]["line"])
     fig = spc_single(
         spc[k]["line"],
-        f"LINE {k}\n{time_text}",
+        f"LINE {k}\n{build_time_range_text(spc[k]['line'])}",
         get_limit(color, k, "LINE"),
         LINE_COLOR
     )
