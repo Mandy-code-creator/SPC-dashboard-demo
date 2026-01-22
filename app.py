@@ -161,7 +161,7 @@ def get_limit(color, prefix, factor):
 # =========================
 def prep_spc(df, north, south):
     tmp = df.copy()
-    tmp["value"] = tmp[[north, south]].mean(axis=1)
+    tmp["value"] = tmp[[north, south]].mean(axis=1, skipna=False)
     return tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=("value", "mean")
@@ -477,6 +477,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
