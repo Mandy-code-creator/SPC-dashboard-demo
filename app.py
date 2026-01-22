@@ -138,12 +138,23 @@ def prep_lab(df, col):
     )
 
 # =========================
-# SPC CHARTS
+# SPC CHART FUNCTIONS
 # =========================
 def finalize_legend(ax):
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     ax.legend(by_label.values(), by_label.keys(), fontsize=9)
+
+def add_stats_outside(ax, mean, std):
+    ax.text(
+        1.01, 0.5,
+        f"Mean = {mean:.3f}\nStd = {std:.3f}",
+        transform=ax.transAxes,
+        ha="left",
+        va="center",
+        fontsize=9,
+        bbox=dict(facecolor="white", alpha=0.85, edgecolor="none")
+    )
 
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -165,20 +176,11 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
         ax.axhline(line_lim[0], color="red", label="LINE LCL")
         ax.axhline(line_lim[1], color="red", label="LINE UCL")
 
-    ax.text(
-        0.99, 0.95,
-        f"Mean = {mean:.3f}\nStd = {std:.3f}",
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none")
-    )
-
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
     finalize_legend(ax)
+    add_stats_outside(ax, mean, std)
     return fig
 
 def spc_single(spc, title, limit, color):
@@ -196,20 +198,11 @@ def spc_single(spc, title, limit, color):
         ax.axhline(limit[0], color="red", label="LCL")
         ax.axhline(limit[1], color="red", label="UCL")
 
-    ax.text(
-        0.99, 0.95,
-        f"Mean = {mean:.3f}\nStd = {std:.3f}",
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none")
-    )
-
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
     finalize_legend(ax)
+    add_stats_outside(ax, mean, std)
     return fig
 
 def download(fig, name):
@@ -280,7 +273,7 @@ for k in spc:
     download(fig, f"LINE_{color}_{k}.png")
 
 # =========================
-# DASHBOARD – DISTRIBUTION
+# DISTRIBUTION DASHBOARD
 # =========================
 st.markdown("---")
 st.markdown("## 📈 Process Distribution Dashboard")
@@ -296,7 +289,6 @@ for i, k in enumerate(spc):
         mean = values.mean()
         std = values.std()
         lcl, ucl = get_limit(color, k, "LINE")
-        center = (ucl + lcl) / 2 if lcl is not None else None
 
         fig, ax = plt.subplots(figsize=(4, 3))
         bins = np.histogram_bin_edges(values, bins=10)
@@ -307,12 +299,14 @@ for i, k in enumerate(spc):
             p.set_facecolor("red" if lcl and (c < lcl or c > ucl) else "#6f42c1")
             p.set_alpha(0.8)
 
-        x = np.linspace(values.min(), values.max(), 200)
+        margin = 0.5 * std
+        x = np.linspace(mean - 3 * std - margin, mean + 3 * std + margin, 400)
         pdf = normal_pdf(x, mean, std)
         ax.plot(x, pdf * len(values) * (bins[1] - bins[0]), color="black")
 
         cp = (ucl - lcl) / (6 * std)
         cpk = min(ucl - mean, mean - lcl) / (3 * std)
+        center = (ucl + lcl) / 2
         ca = abs(mean - center) / ((ucl - lcl) / 2)
 
         ax.set_title(f"{k}\nCp={cp:.2f}  Cpk={cpk:.2f}  Ca={ca:.2f}")
