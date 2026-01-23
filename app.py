@@ -167,6 +167,12 @@ def prep_lab(df, col):
         Time=("Time", "min"),
         value=(col, "mean")
     )
+def add_ooc(df, lcl, ucl):
+    df = df.copy()
+    df["OOC"] = False
+    if lcl is not None and ucl is not None:
+        df["OOC"] = (df["value"] < lcl) | (df["value"] > ucl)
+    return df
 
 # =========================
 # SPC DATA
@@ -185,6 +191,14 @@ spc = {
         "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
     }
 }
+for k in spc:
+    # LINE
+    lcl, ucl = get_limit(color, k, "LINE")
+    spc[k]["line"] = add_ooc(spc[k]["line"], lcl, ucl)
+
+    # LAB
+    lcl, ucl = get_limit(color, k, "LAB")
+    spc[k]["lab"] = add_ooc(spc[k]["lab"], lcl, ucl)
 
 # =========================
 # MAIN DASHBOARD
@@ -313,22 +327,30 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    mean = spc["value"].mean()
-    std = spc["value"].std()
+    ok = spc[~spc["OOC"]]
+    bad = spc[spc["OOC"]]
 
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    # batch bình thường
+    ax.plot(ok["製造批號"], ok["value"], "o-", color=color)
 
+    # 🔴 batch lệch màu
+    ax.scatter(
+        bad["製造批號"],
+        bad["value"],
+        color="red",
+        s=100,
+        label="Out of control"
+    )
+
+    # LCL / UCL
     if limit[0] is not None:
-        ax.axhline(limit[0], color="red", label="LCL")
-        ax.axhline(limit[1], color="red", label="UCL")
+        ax.axhline(limit[0], color="red", linestyle="--")
+        ax.axhline(limit[1], color="red", linestyle="--")
 
     ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
+    ax.legend()
     return fig
 
 
@@ -472,6 +494,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
