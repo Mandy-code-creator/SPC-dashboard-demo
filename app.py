@@ -303,6 +303,22 @@ for k in spc:
 
 summary_line_df = pd.DataFrame(summary_line)
 summary_lab_df = pd.DataFrame(summary_lab)
+# =========================
+st.markdown("### 📄 Export Audit PDF")
+
+pdf_buf = export_pdf_report(
+    color,
+    year,
+    summary_line_df,
+    summary_lab_df
+)
+
+st.download_button(
+    "⬇ Download SPC Audit PDF",
+    data=pdf_buf,
+    file_name=f"SPC_Report_{color}_{year}.pdf",
+    mime="application/pdf"
+)
 
 # =========================
 # DISPLAY SIDE BY SIDE
@@ -801,6 +817,7 @@ def export_pdf_report(color, year, summary_line_df, summary_lab_df):
     doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 
