@@ -761,216 +761,185 @@ else:
 # =========================================================
 # 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
 # =========================================================
-# 🧱 CROSS-WEB THICKNESS SPC (LINE ONLY – SAFE VERSION)
-# =========================================================
-
+import streamlit as st
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.markdown("---")
-st.markdown("## 🧱 Cross-Web Thickness SPC (LINE)")
-
 # =========================
-# BASIC CHECK
+# PAGE CONFIG
 # =========================
-if "df" not in globals():
-    st.error("❌ df not found. Please load main data first.")
-    st.stop()
-
-df_thk = df.copy()
-df_thk["Time"] = pd.to_datetime(df_thk["Time"])
-
-# =========================
-# SIDEBAR – FILTER
-# =========================
-st.sidebar.divider()
-st.sidebar.header("🧱 Thickness Filter")
-
-# ---- Paint code ----
-thk_color = st.sidebar.selectbox(
-    "Paint code (Thickness)",
-    sorted(df_thk["塗料編號"].dropna().unique())
+st.set_page_config(
+    page_title="Cross-Web Thickness SPC",
+    page_icon="🎨",
+    layout="wide"
 )
 
-# ---- Time range ----
-date_range = st.sidebar.date_input(
+st.title("🎨 Cross-Web Thickness SPC (Coil-based)")
+
+# =========================
+# DATA LOADING
+# =========================
+DATA_URL = "PUT_YOUR_GOOGLE_SHEET_CSV_URL_HERE"
+
+@st.cache_data
+def load_data():
+    df = pd.read_csv(DATA_URL)
+    df["Time"] = pd.to_datetime(df["Time"])
+    return df
+
+df_raw = load_data()
+
+# =========================
+# REQUIRED COLUMNS
+# =========================
+REQ_COLS = [
+    "Coil No.",
+    "塗料編號",
+    "Time",
+    "Coating Thickness 正面",
+    "Coating Thickness 正面 - 北",
+    "Coating Thickness 正面 - 南",
+    "Avergage Thickness (µm)正面"
+]
+
+missing = [c for c in REQ_COLS if c not in df_raw.columns]
+if missing:
+    st.error(f"❌ Missing required columns: {missing}")
+    st.stop()
+
+# =========================
+# FILTERS
+# =========================
+st.sidebar.header("🔎 Filters")
+
+# Time filter
+min_t, max_t = df_raw["Time"].min(), df_raw["Time"].max()
+time_range = st.sidebar.date_input(
     "Time range",
-    [
-        df_thk["Time"].min().date(),
-        df_thk["Time"].max().date()
-    ]
+    [min_t.date(), max_t.date()]
 )
 
-# =========================
-# APPLY FILTER
-# =========================
-df_thk = df_thk[df_thk["塗料編號"] == thk_color]
+# Paint code filter
+paint_list = sorted(df_raw["塗料編號"].dropna().unique())
+paint_sel = st.sidebar.multiselect(
+    "Paint / Color code",
+    paint_list,
+    default=paint_list
+)
 
-if len(date_range) == 2:
-    start, end = date_range
-    df_thk = df_thk[
-        (df_thk["Time"].dt.date >= start) &
-        (df_thk["Time"].dt.date <= end)
-    ]
+df = df_raw[
+    (df_raw["Time"].dt.date >= time_range[0]) &
+    (df_raw["Time"].dt.date <= time_range[1]) &
+    (df_raw["塗料編號"].isin(paint_sel))
+]
 
-if df_thk.empty:
-    st.warning("No thickness data after filtering")
+if df.empty:
+    st.warning("No data after filtering")
     st.stop()
 
 # =========================
-# COLUMN MAPPING (ANTI-ERROR)
-# =========================
-st.markdown("### 🔗 Thickness Column Mapping")
-
-num_cols = df_thk.select_dtypes(include="number").columns.tolist()
-
-col_target = st.selectbox("Target thickness column", num_cols)
-col_north  = st.selectbox("North (CD) thickness column", num_cols)
-col_south  = st.selectbox("South (CD) thickness column", num_cols)
-col_avg    = st.selectbox("Average thickness column", num_cols)
-
-if len({col_target, col_north, col_south, col_avg}) < 4:
-    st.error("❌ Please select 4 different thickness columns")
-    st.stop()
-
-# =========================
-# AGGREGATE BY COIL
+# COIL-BASED AGGREGATION
 # =========================
 coil_df = (
-    df_thk
-    .groupby("製造批號", as_index=False)
+    df
+    .groupby(["Coil No.", "塗料編號"])
     .agg(
-        Time=("Time", "min"),
-        Target=(col_target, "mean"),
-        Avg=(col_avg, "mean"),
-        North=(col_north, "mean"),
-        South=(col_south, "mean")
+        Coil_Time=("Time", "min"),
+        Mean_Thickness=("Avergage Thickness (µm)正面", "mean"),
+        Target_Thickness=("Coating Thickness 正面", "mean"),
+        CD_Variation=(
+            "Coating Thickness 正面 - 北",
+            lambda x: np.nan
+        )
     )
+    .reset_index()
 )
 
-coil_df["CD_Diff"] = coil_df["North"] - coil_df["South"]
-coil_df["CD_Abs"] = coil_df["CD_Diff"].abs()
+# CD variation = |North − South|
+cd_df = (
+    df.groupby("Coil No.")
+    .apply(
+        lambda x: np.abs(
+            x["Coating Thickness 正面 - 北"].mean()
+            - x["Coating Thickness 正面 - 南"].mean()
+        )
+    )
+    .reset_index(name="CD_Variation")
+)
 
-# =========================
-# SPC STAT
-# =========================
-target = coil_df["Target"].mean()
-mean_avg = coil_df["Avg"].mean()
-std_avg = coil_df["Avg"].std()
-
-ucl = mean_avg + 3 * std_avg
-lcl = mean_avg - 3 * std_avg
+coil_df = coil_df.drop(columns="CD_Variation").merge(
+    cd_df, on="Coil No.", how="left"
+)
 
 # =========================
 # KPI
 # =========================
-c1, c2, c3, c4 = st.columns(4)
-
-c1.metric("Target (µm)", f"{target:.2f}")
-c2.metric("Mean Avg (µm)", f"{mean_avg:.2f}")
-c3.metric("Std Dev (µm)", f"{std_avg:.3f}")
-c4.metric("Mean |CD diff| (µm)", f"{coil_df['CD_Abs'].mean():.3f}")
+c1, c2, c3 = st.columns(3)
+c1.metric("Coils", len(coil_df))
+c2.metric("Mean Thickness (µm)", f"{coil_df['Mean_Thickness'].mean():.2f}")
+c3.metric("Mean CD Variation (µm)", f"{coil_df['CD_Variation'].mean():.2f}")
 
 # =========================
-# SPC CHART – AVERAGE
+# SPC CHART – THICKNESS BY COIL
 # =========================
+st.subheader("📈 Mean Thickness SPC (per Coil)")
+
+coil_df = coil_df.sort_values("Coil_Time")
+
+mean = coil_df["Mean_Thickness"].mean()
+std = coil_df["Mean_Thickness"].std()
+ucl = mean + 3 * std
+lcl = mean - 3 * std
+
 fig, ax = plt.subplots(figsize=(12, 4))
-
-ax.plot(
-    coil_df["製造批號"],
-    coil_df["Avg"],
-    marker="o",
-    linewidth=2,
-    label="Average Thickness"
-)
-
-ax.axhline(target, linestyle="--", color="green", label="Target")
-ax.axhline(mean_avg, linestyle=":", color="blue", label="Mean")
-ax.axhline(ucl, linestyle="--", color="red", label="+3σ")
-ax.axhline(lcl, linestyle="--", color="red", label="-3σ")
-
-ooc = (coil_df["Avg"] > ucl) | (coil_df["Avg"] < lcl)
-ax.scatter(
-    coil_df.loc[ooc, "製造批號"],
-    coil_df.loc[ooc, "Avg"],
-    color="red",
-    s=80,
-    zorder=5,
-    label="OOC"
-)
-
-ax.set_title(f"CD Average Thickness SPC — Paint {thk_color}")
+ax.plot(coil_df["Coil_Time"], coil_df["Mean_Thickness"], marker="o")
+ax.axhline(mean, linestyle="--", linewidth=2, label="Mean")
+ax.axhline(ucl, color="red", linestyle="--", label="UCL")
+ax.axhline(lcl, color="red", linestyle="--", label="LCL")
 ax.set_ylabel("Thickness (µm)")
-ax.tick_params(axis="x", rotation=45)
-ax.grid(True)
-ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-fig.subplots_adjust(right=0.78)
-
+ax.legend()
 st.pyplot(fig)
 
 # =========================
-# CD IMBALANCE CHART
+# THICKNESS vs COLOR
 # =========================
-st.markdown("### 📏 Cross-Web Imbalance (North − South)")
+st.subheader("🎨 Thickness Distribution by Paint Code (per Coil)")
 
-fig2, ax2 = plt.subplots(figsize=(12, 4))
-
-ax2.plot(
-    coil_df["製造批號"],
-    coil_df["CD_Diff"],
-    marker="o",
-    linewidth=2
+fig2, ax2 = plt.subplots(figsize=(10, 4))
+coil_df.boxplot(
+    column="Mean_Thickness",
+    by="塗料編號",
+    ax=ax2,
+    grid=False
 )
-
-ax2.axhline(0, color="black", linewidth=1)
-ax2.axhline(1, linestyle="--", color="orange", label="+1 µm")
-ax2.axhline(-1, linestyle="--", color="orange", label="-1 µm")
-
-ax2.set_ylabel("Δ Thickness (µm)")
-ax2.tick_params(axis="x", rotation=45)
-ax2.grid(True)
-ax2.legend()
-
+ax2.set_title("")
+ax2.set_ylabel("Thickness (µm)")
+plt.suptitle("")
 st.pyplot(fig2)
 
 # =========================
-# THICKNESS ↔ COLOR (OPTIONAL)
+# CD VARIATION
 # =========================
-st.markdown("### 🎨 Thickness vs Color (LINE)")
+st.subheader("↔ CD Thickness Variation (North − South)")
 
-for k in ["ΔL", "Δa", "Δb"]:
-    north_col = f"正-北 {k}"
-    south_col = f"正-南 {k}"
-
-    if north_col in df.columns and south_col in df.columns:
-        color_df = (
-            df.groupby("製造批號")[[north_col, south_col]]
-            .mean()
-            .mean(axis=1)
-            .reset_index(name=k)
-        )
-
-        merged = coil_df.merge(color_df, on="製造批號", how="inner")
-
-        fig3, ax3 = plt.subplots(figsize=(5, 4))
-        ax3.scatter(merged["Avg"], merged[k])
-        ax3.set_xlabel("Average Thickness (µm)")
-        ax3.set_ylabel(k)
-        ax3.set_title(f"{k} vs Thickness")
-        ax3.grid(True)
-
-        st.pyplot(fig3)
+fig3, ax3 = plt.subplots(figsize=(12, 4))
+ax3.plot(coil_df["Coil_Time"], coil_df["CD_Variation"], marker="o")
+ax3.set_ylabel("CD Variation (µm)")
+st.pyplot(fig3)
 
 # =========================
 # DATA TABLE
 # =========================
-with st.expander("📋 Coil Thickness Detail"):
-    st.dataframe(
-        coil_df.round(3),
-        use_container_width=True,
-        hide_index=True
-    )
-
+st.subheader("📋 Coil Summary Table")
+st.dataframe(
+    coil_df.style.format({
+        "Mean_Thickness": "{:.2f}",
+        "Target_Thickness": "{:.2f}",
+        "CD_Variation": "{:.2f}"
+    }),
+    use_container_width=True
+)
 
 
 
