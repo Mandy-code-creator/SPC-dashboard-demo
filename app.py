@@ -479,101 +479,120 @@ def normal_pdf(x, mean, std):
 
 
 # =========================
+# =========================
+# LINE PROCESS DISTRIBUTION
+# =========================
 st.markdown("---")
 st.markdown("## 📈 Line Process Distribution Dashboard")
+
+def normal_pdf(x, mean, std):
+    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
+        -0.5 * ((x - mean) / std) ** 2
+    )
 
 cols = st.columns(3)
 
 for i, k in enumerate(spc):
     with cols[i]:
         values = spc[k]["line"]["value"].dropna()
-        lsl, usl = get_limit(color, k, "LINE")
-
-        if len(values) < 2:
+        if len(values) < 3:
             st.warning("Not enough data")
             continue
 
         mean = values.mean()
-        std = values.std(ddof=1)
-
-        ca, cp, cpk = calc_capability(values, lsl, usl)
+        std = values.std()
+        lcl, ucl = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(5, 4))
 
         # Histogram
-        bins = np.histogram_bin_edges(values, bins=12)
-        counts, bins, patches = ax.hist(
+        bins = np.histogram_bin_edges(values, bins=10)
+        counts, _, patches = ax.hist(
             values,
             bins=bins,
-            color="#74c0fc",
             edgecolor="white",
+            color="#4dabf7",
             alpha=0.85
         )
 
         # Highlight out-of-spec bins
-        if lsl is not None and usl is not None:
-            for p, l, r in zip(patches, bins[:-1], bins[1:]):
-                center = (l + r) / 2
-                if center < lsl or center > usl:
+        for p, l, r in zip(patches, bins[:-1], bins[1:]):
+            center = (l + r) / 2
+            if lcl is not None and ucl is not None:
+                if center < lcl or center > ucl:
                     p.set_facecolor("#ff6b6b")
 
-        # Normal curve (kéo dài đuôi 2 bên)
+        # Normal curve (long tail)
         if std > 0:
-            x = np.linspace(
-                min(values.min(), lsl or values.min()) - 3 * std,
-                max(values.max(), usl or values.max()) + 3 * std,
-                400
-            )
+            x = np.linspace(mean - 4 * std, mean + 4 * std, 500)
             pdf = normal_pdf(x, mean, std)
             ax.plot(
                 x,
                 pdf * len(values) * (bins[1] - bins[0]),
                 color="black",
-                linewidth=2,
-                label="Normal"
+                linewidth=2
             )
 
-        # USL / LSL lines
-        if lsl is not None:
-            ax.axvline(lsl, color="red", linestyle="--", linewidth=2, label="LSL")
-        if usl is not None:
-            ax.axvline(usl, color="red", linestyle="--", linewidth=2, label="USL")
+        # USL / LSL
+        if lcl is not None:
+            ax.axvline(lcl, color="red", linestyle="--", linewidth=1.5, label="LSL")
+        if ucl is not None:
+            ax.axvline(ucl, color="red", linestyle="--", linewidth=1.5, label="USL")
 
-        # Mean line
-        ax.axvline(mean, color="green", linestyle="-.", linewidth=2, label="Mean")
+        # Info box
+        ax.text(
+            0.02, 0.95,
+            f"N = {len(values)}\n"
+            f"Mean = {mean:.3f}\n"
+            f"Std = {std:.3f}",
+            transform=ax.transAxes,
+            va="top",
+            fontsize=9,
+            bbox=dict(facecolor="white", alpha=0.85)
+        )
 
-        # Capability box
-        if cp is not None:
-            ax.text(
-                0.98, 0.95,
-                f"Ca  = {ca}\nCp  = {cp}\nCpk = {cpk}",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.9)
-            )
-
-        ax.set_title(f"{k} – LINE")
-        ax.set_ylabel("Count")
+        ax.set_title(k)
         ax.grid(axis="y", alpha=0.3)
         ax.legend(fontsize=8)
 
         st.pyplot(fig)
 
-        # ===== DOWNLOAD IMAGE =====
+        # =========================
+        # DOWNLOAD IMAGE
+        # =========================
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
         buf.seek(0)
 
         st.download_button(
-            label="📥 Download chart",
+            label="⬇ Download chart image",
             data=buf,
             file_name=f"{k}_line_distribution.png",
             mime="image/png"
         )
 
-        plt.close(fig)
+        # =========================
+        # BIN SUMMARY TABLE (THAY HOVER)
+        # =========================
+        bin_edges = np.histogram_bin_edges(values, bins=10)
+        counts, _ = np.histogram(values, bins=bin_edges)
+        bin_width = bin_edges[1] - bin_edges[0]
+
+        bin_df = pd.DataFrame({
+            "Bin Range": [
+                f"{bin_edges[i]:.3f} ~ {bin_edges[i+1]:.3f}"
+                for i in range(len(bin_edges) - 1)
+            ],
+            "Count": counts,
+            "Density": (counts / (len(values) * bin_width)).round(4)
+        })
+
+        with st.expander("📊 Distribution bin details"):
+            st.dataframe(
+                bin_df,
+                use_container_width=True,
+                hide_index=True
+            )
 
 # =========================
 # LAB PROCESS DISTRIBUTION
@@ -676,6 +695,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
