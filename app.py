@@ -357,10 +357,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
         out_line = (y_line > UCL_line) | (y_line < LCL_line)
         ax.scatter(x_line[out_line], y_line[out_line], color="red", s=80, zorder=5)
 
-    # ===== sigma lines =====
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
-
+    
     # ===== control limits =====
     if lab_lim[0] is not None:
         ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
@@ -595,6 +592,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
