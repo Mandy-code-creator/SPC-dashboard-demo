@@ -162,20 +162,13 @@ def get_limit(color, prefix, factor):
 def prep_spc(df, north, south):
     tmp = df.copy()
 
-    # chỉ lấy cuộn có đủ 2 vị trí
+    # chỉ giữ cuộn có đủ 2 vị trí đo
     tmp = tmp.dropna(subset=[north, south])
-
-    # lấy lần đo MỚI NHẤT của mỗi cuộn
-    tmp = (
-        tmp.sort_values("Time")
-           .groupby(["製造批號", "coil_id"], as_index=False)
-           .last()
-    )
 
     # 1 cuộn = trung bình Bắc / Nam
     tmp["value"] = tmp[[north, south]].mean(axis=1)
 
-    # 1 batch = trung bình các cuộn
+    # 1 batch = 製造批號
     return tmp.groupby("製造批號", as_index=False).agg(
         Time=("Time", "min"),
         value=("value", "mean")
@@ -494,6 +487,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
