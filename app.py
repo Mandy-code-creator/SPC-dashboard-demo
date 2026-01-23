@@ -261,26 +261,16 @@ else:
 
 # =========================
 # EXPORT EXCEL
-# =========================
-st.subheader("📤 Xuất báo cáo")
+st.subheader("📤 Xuất báo cáo (CSV)")
 
-output = io.BytesIO()
-with pd.ExcelWriter(output) as writer:
-    batch_summary_df.to_excel(
-        writer,
-        index=False,
-        sheet_name="Batch_Summary"
-    )
-    coil_df.to_excel(
-        writer,
-        index=False,
-        sheet_name="Coil_Data"
-    )
+csv = batch_summary_df.to_csv(index=False).encode("utf-8-sig")
 
 st.download_button(
-    label="⬇️ Download Excel Report",
-    data=output.getvalue(),
-    file_name="Batch_LAB_Report.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    label="⬇️ Download CSV Report",
+    data=csv,
+    file_name="Batch_LAB_Report.csv",
+    mime="text/csv"
 )
+
+
 
