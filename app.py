@@ -88,7 +88,7 @@ all_years = sorted(df["year"].unique())
 latest_year = max(all_years)
 
 selected_years = st.sidebar.multiselect(
-    "📅 Chọn năm",
+    "📅  Select Year(s)",
     options=all_years,
     default=[latest_year]
 )
@@ -521,6 +521,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
