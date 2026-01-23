@@ -4,12 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import numpy as np
 import math
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
-)
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
+
 
 # =========================
 # PAGE CONFIG
@@ -239,6 +234,49 @@ spc = {
     }
 }
 
+# ======================== EXPORT FILE
+def export_pdf_report(color, year, summary_line_df, summary_lab_df):
+    buf = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=2*cm,
+        leftMargin=2*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    # ===== TITLE =====
+    story.append(Paragraph(
+        f"<b>SPC COLOR REPORT</b><br/>Color: {color} | Year: {year}",
+        styles["Title"]
+    ))
+    story.append(Spacer(1, 12))
+
+    # ===== LINE SUMMARY =====
+    story.append(Paragraph("<b>LINE SUMMARY</b>", styles["Heading2"]))
+    for _, r in summary_line_df.iterrows():
+        story.append(Paragraph(
+            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
+            styles["Normal"]
+        ))
+    story.append(PageBreak())
+
+    # ===== LAB SUMMARY =====
+    story.append(Paragraph("<b>LAB SUMMARY</b>", styles["Heading2"]))
+    for _, r in summary_lab_df.iterrows():
+        story.append(Paragraph(
+            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
+            styles["Normal"]
+        ))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
 # =========================
 # MAIN DASHBOARD
 # =========================
@@ -775,48 +813,8 @@ if ooc_rows:
 else:
     st.success("✅ No out-of-control batches detected")
 
-def export_pdf_report(color, year, summary_line_df, summary_lab_df):
-    buf = io.BytesIO()
 
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        rightMargin=2*cm,
-        leftMargin=2*cm,
-        topMargin=2*cm,
-        bottomMargin=2*cm
-    )
 
-    styles = getSampleStyleSheet()
-    story = []
-
-    # ===== TITLE =====
-    story.append(Paragraph(
-        f"<b>SPC COLOR REPORT</b><br/>Color: {color} | Year: {year}",
-        styles["Title"]
-    ))
-    story.append(Spacer(1, 12))
-
-    # ===== LINE SUMMARY =====
-    story.append(Paragraph("<b>LINE SUMMARY</b>", styles["Heading2"]))
-    for _, r in summary_line_df.iterrows():
-        story.append(Paragraph(
-            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
-            styles["Normal"]
-        ))
-    story.append(PageBreak())
-
-    # ===== LAB SUMMARY =====
-    story.append(Paragraph("<b>LAB SUMMARY</b>", styles["Heading2"]))
-    for _, r in summary_lab_df.iterrows():
-        story.append(Paragraph(
-            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
-            styles["Normal"]
-        ))
-
-    doc.build(story)
-    buf.seek(0)
-    return buf
 
 
 
