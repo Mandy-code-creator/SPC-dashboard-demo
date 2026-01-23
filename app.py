@@ -479,8 +479,35 @@ def normal_pdf(x, mean, std):
 
 
 # =========================
+# =========================
 # LINE PROCESS DISTRIBUTION
 # =========================
+
+import plotly.graph_objects as go
+import numpy as np
+import streamlit as st
+
+# ===== Capability calculation (NO PPK)
+def calc_capability(values, lcl, ucl):
+    if lcl is None or ucl is None:
+        return None, None, None
+
+    mean = values.mean()
+    std = values.std()
+
+    if std == 0 or np.isnan(std):
+        return None, None, None
+
+    cp = (ucl - lcl) / (6 * std)
+    cpk = min(
+        (ucl - mean) / (3 * std),
+        (mean - lcl) / (3 * std)
+    )
+    ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
+
+    return round(ca, 2), round(cp, 2), round(cpk, 2)
+
+
 st.markdown("---")
 st.markdown("## 📈 Line Process Distribution Dashboard")
 
@@ -488,6 +515,8 @@ cols = st.columns(3)
 
 for i, k in enumerate(spc):
     with cols[i]:
+
+        # ===== DATA
         values = spc[k]["line"]["value"].dropna()
         mean = values.mean()
         std = values.std()
@@ -495,48 +524,69 @@ for i, k in enumerate(spc):
 
         ca, cp, cpk = calc_capability(values, lcl, ucl)
 
-        fig, ax = plt.subplots(figsize=(4, 3))
+        # ===== FIGURE
+        fig = go.Figure()
 
-        bins = np.histogram_bin_edges(values, bins=10)
-        counts, _, patches = ax.hist(
-            values,
-            bins=bins,
-            edgecolor="white",
-            color="#4dabf7"
+        # Histogram (HOVER DATA)
+        fig.add_trace(go.Histogram(
+            x=values,
+            nbinsx=10,
+            marker_color="#4dabf7",
+            hovertemplate=
+                "Value: %{x:.3f}<br>" +
+                "Count: %{y}<extra></extra>"
+        ))
+
+        # ===== Normal curve
+        if std > 0:
+            x_curve = np.linspace(values.min(), values.max(), 300)
+            y_curve = (
+                (1 / (std * np.sqrt(2 * np.pi))) *
+                np.exp(-0.5 * ((x_curve - mean) / std) ** 2)
+            ) * len(values) * (values.max() - values.min()) / 10
+
+            fig.add_trace(go.Scatter(
+                x=x_curve,
+                y=y_curve,
+                mode="lines",
+                line=dict(color="black"),
+                hovertemplate=
+                    "Normal<br>" +
+                    "x: %{x:.3f}<br>" +
+                    "y: %{y:.3f}<extra></extra>"
+            ))
+
+        # ===== Mean & Spec limits
+        fig.add_vline(x=mean, line_dash="dot", annotation_text="Mean")
+
+        if lcl is not None and ucl is not None:
+            fig.add_vline(x=lcl, line_dash="dash", annotation_text="LCL")
+            fig.add_vline(x=ucl, line_dash="dash", annotation_text="UCL")
+
+        # ===== Capability box
+        if cp is not None:
+            fig.add_annotation(
+                x=0.98,
+                y=0.95,
+                xref="paper",
+                yref="paper",
+                text=f"Ca = {ca}<br>Cp = {cp}<br>Cpk = {cpk}",
+                showarrow=False,
+                align="right",
+                bgcolor="white",
+                bordercolor="gray"
+            )
+
+        fig.update_layout(
+            title=k,
+            height=330,
+            bargap=0.05,
+            showlegend=False,
+            margin=dict(l=20, r=20, t=40, b=20)
         )
 
-        # Highlight out-of-spec bins
-        for p, l, r in zip(patches, bins[:-1], bins[1:]):
-            center = (l + r) / 2
-            if lcl is not None and ucl is not None:
-                if center < lcl or center > ucl:
-                    p.set_facecolor("red")
+        st.plotly_chart(fig, use_container_width=True)
 
-        # Normal curve
-        if std > 0:
-            x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
-            pdf = normal_pdf(x, mean, std)
-            ax.plot(
-                x,
-                pdf * len(values) * (bins[1] - bins[0]),
-                color="black"
-            )
-
-        # Capability box
-        if cp is not None:
-            ax.text(
-                0.98, 0.95,
-                f"Ca={ca}\nCp={cp}\nCpk={cpk}",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.85)
-            )
-
-        ax.set_title(k)
-        ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
 
 
 # =========================
@@ -640,6 +690,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
