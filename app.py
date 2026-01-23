@@ -876,58 +876,82 @@ k3.metric("Mean CD Variation (µm)", f"{coil_df['CD_Variation'].mean():.2f}")
 
 # =====================================
 # SPC – MEAN THICKNESS
-# =====================================
-st.subheader("📈 Mean Thickness SPC (per Coil)")
+# =========================
+# 📈 MEAN THICKNESS SPC (PER COIL)
+# =========================
 
-mean = coil_df["Mean_Thickness"].mean()
-std = coil_df["Mean_Thickness"].std()
-ucl = mean + 3 * std
-lcl = mean - 3 * std
+st.markdown("---")
+st.subheader("📈 Mean Thickness SPC (per Coil – colored by Paint Code)")
 
-fig, ax = plt.subplots(figsize=(12, 4))
-ax.plot(coil_df["Coil_Time"], coil_df["Mean_Thickness"], marker="o")
-ax.axhline(mean, linestyle="--", label="Mean")
-ax.axhline(ucl, color="red", linestyle="--", label="UCL")
-ax.axhline(lcl, color="red", linestyle="--", label="LCL")
-ax.set_ylabel("Thickness (µm)")
-ax.legend()
-ax.grid(True)
-st.pyplot(fig)
+# ---------- CHECK REQUIRED COLUMNS ----------
+req_cols = [
+    "Coil No.",
+    "塗料編號",
+    "Coating Thickness (N)",
+    "Coating Thickness (S)"
+]
 
-# =====================================
-# CD VARIATION SPC
-# =====================================
-st.subheader("↔ Cross-Web (CD) Thickness Variation | |N − S|")
+missing = [c for c in req_cols if c not in df.columns]
+if missing:
+    st.error(f"❌ Missing required columns: {missing}")
+    st.stop()
 
-cd_mean = coil_df["CD_Variation"].mean()
-cd_std = coil_df["CD_Variation"].std()
-cd_ucl = cd_mean + 3 * cd_std
-
-fig2, ax2 = plt.subplots(figsize=(12, 4))
-ax2.plot(coil_df["Coil_Time"], coil_df["CD_Variation"], marker="o")
-ax2.axhline(cd_mean, linestyle="--", label="Mean CD")
-ax2.axhline(cd_ucl, color="red", linestyle="--", label="UCL")
-ax2.set_ylabel("CD Variation (µm)")
-ax2.legend()
-ax2.grid(True)
-st.pyplot(fig2)
-
-# =====================================
-# THICKNESS vs COLOR
-# =====================================
-st.subheader("🎨 Thickness Distribution by Paint Code (per Coil)")
-
-fig3, ax3 = plt.subplots(figsize=(10, 4))
-coil_df.boxplot(
-    column="Mean_Thickness",
-    by="塗料編號",
-    ax=ax3,
-    grid=False
+# ---------- GROUP BY COIL ----------
+coil_df = (
+    df
+    .groupby(["Coil No.", "塗料編號"], as_index=False)
+    .agg(
+        Mean_N=("Coating Thickness (N)", "mean"),
+        Mean_S=("Coating Thickness (S)", "mean")
+    )
 )
-ax3.set_ylabel("Thickness (µm)")
-ax3.set_title("")
-plt.suptitle("")
-st.pyplot(fig3)
+
+coil_df["Mean_Thickness"] = (coil_df["Mean_N"] + coil_df["Mean_S"]) / 2
+
+# ---------- COIL SEQUENCE ----------
+coil_df = coil_df.reset_index(drop=True)
+coil_df["Coil_Seq"] = coil_df.index + 1
+
+# ---------- SPC LIMITS ----------
+cl = coil_df["Mean_Thickness"].mean()
+std = coil_df["Mean_Thickness"].std()
+ucl = cl + 3 * std
+lcl = cl - 3 * std
+
+# ---------- PLOT ----------
+fig, ax = plt.subplots(figsize=(14, 4))
+
+for paint, g in coil_df.groupby("塗料編號"):
+    ax.scatter(
+        g["Coil_Seq"],
+        g["Mean_Thickness"],
+        s=70,
+        label=str(paint)
+    )
+
+ax.plot(
+    coil_df["Coil_Seq"],
+    coil_df["Mean_Thickness"],
+    linewidth=1,
+    alpha=0.5
+)
+
+ax.axhline(cl, linestyle="--", linewidth=2, label="Center Line")
+ax.axhline(ucl, linestyle="--", color="red", label="UCL")
+ax.axhline(lcl, linestyle="--", color="red", label="LCL")
+
+ax.set_xlabel("Coil sequence")
+ax.set_ylabel("Mean Thickness (µm)")
+ax.set_title("Mean Thickness SPC – 1 Point = 1 Coil")
+ax.grid(True)
+
+ax.legend(
+    title="Paint Code",
+    bbox_to_anchor=(1.02, 1),
+    loc="upper left"
+)
+
+st.pyplot(fig)
 
 # =====================================
 # DATA TABLE
@@ -943,6 +967,7 @@ st.dataframe(
     }),
     use_container_width=True
 )
+
 
 
 
