@@ -160,27 +160,28 @@ def get_limit(color, prefix, factor):
 # PREP SPC DATA
 # =========================
 def prep_spc(df, north, south):
-    tmp = df[["製造批號", "Time", north, south]].copy()
+    tmp = df.copy()
 
-    # giá trị của 1 CUỘN = mean(Bắc, Nam)
-   tmp = tmp.dropna(subset=[north, south])
-tmp["coil_value"] = tmp[[north, south]].mean(axis=1)
+    # ép kiểu số
+    tmp[north] = pd.to_numeric(tmp[north], errors="coerce")
+    tmp[south] = pd.to_numeric(tmp[south], errors="coerce")
 
+    # LOẠI cuộn thiếu Bắc hoặc Nam
+    tmp = tmp.dropna(subset=[north, south])
 
-    # bỏ cuộn lỗi
-    tmp = tmp.dropna(subset=["coil_value"])
+    # 1 cuộn = mean(Bắc, Nam)
+    tmp["coil_value"] = tmp[[north, south]].mean(axis=1)
 
-    # gộp theo BATCH
+    # 1 batch = mean các cuộn
     batch_df = (
         tmp
-        .groupby("製造批號", as_index=False)
-        .agg(
-            Time=("Time", "min"),
-            value=("coil_value", "mean")
-        )
+        .groupby("製造批號", as_index=False)["coil_value"]
+        .mean()
+        .rename(columns={"coil_value": "value"})
     )
 
     return batch_df
+
 
 def prep_lab(df, col):
     tmp = df.copy()
@@ -493,6 +494,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
