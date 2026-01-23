@@ -81,7 +81,7 @@ def load_limit():
 df = load_data()
 limit_df = load_limit()
 # ===== CHỌN NĂM =====
-df["date"] = pd.to_datetime(df["date"])
+df["date"] = pd.to_datetime(df["Time"])
 df["year"] = df["date"].dt.year
 
 all_years = sorted(df["year"].unique())
@@ -94,6 +94,7 @@ selected_years = st.sidebar.multiselect(
 )
 
 df = df[df["year"].isin(selected_years)]
+
 
 # =========================
 # FIX COLUMN NAMES
@@ -520,6 +521,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
