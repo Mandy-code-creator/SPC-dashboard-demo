@@ -522,6 +522,48 @@ for i, k in enumerate(spc):
 
         st.pyplot(fig)
 
+# =========================
+# 🚨 OUT-OF-CONTROL BATCH TABLE
+# =========================
+st.markdown("## 🚨 Out-of-Control Batches")
+
+ooc_rows = []
+
+for k in spc:
+    # ===== LINE =====
+    lcl, ucl = get_limit(color, k, "LINE")
+    ooc_line = detect_out_of_control(spc[k]["line"], lcl, ucl)
+
+    for _, r in ooc_line.iterrows():
+        ooc_rows.append({
+            "Factor": k,
+            "Type": "LINE",
+            "製造批號": r["製造批號"],
+            "Value": round(r["value"], 2),
+            "Rule_CL": r["Rule_CL"],
+            "Rule_3Sigma": r["Rule_3Sigma"]
+        })
+
+    # ===== LAB =====
+    lcl, ucl = get_limit(color, k, "LAB")
+    ooc_lab = detect_out_of_control(spc[k]["lab"], lcl, ucl)
+
+    for _, r in ooc_lab.iterrows():
+        ooc_rows.append({
+            "Factor": k,
+            "Type": "LAB",
+            "製造批號": r["製造批號"],
+            "Value": round(r["value"], 2),
+            "Rule_CL": r["Rule_CL"],
+            "Rule_3Sigma": r["Rule_3Sigma"]
+        })
+
+if ooc_rows:
+    ooc_df = pd.DataFrame(ooc_rows)
+    st.dataframe(ooc_df, use_container_width=True)
+else:
+    st.success("✅ No out-of-control batches detected")
+
 
 
 
