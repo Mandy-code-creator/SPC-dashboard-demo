@@ -265,7 +265,7 @@ else:
 st.subheader("📤 Xuất báo cáo")
 
 output = io.BytesIO()
-with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+with pd.ExcelWriter(output) as writer:
     batch_summary_df.to_excel(
         writer,
         index=False,
@@ -283,3 +283,4 @@ st.download_button(
     file_name="Batch_LAB_Report.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+
