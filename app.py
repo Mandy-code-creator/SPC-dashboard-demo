@@ -37,6 +37,10 @@ def export_pdf_report(color, year, summary_line_df, summary_lab_df, figs):
         topMargin=2*cm,
         bottomMargin=2*cm
     )
+def save_fig_to_png(fig, name):
+    path = f"/tmp/{name}.png"
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    return path
 
     styles = getSampleStyleSheet()
     story = []
@@ -543,6 +547,8 @@ def download(fig, name):
     buf.seek(0)
     st.download_button("📥 Download PNG", buf, name, "image/png")
 
+pdf_images = []
+
 
 # =========================
 # DASHBOARD
@@ -559,6 +565,27 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
+
+    img_path = save_fig_to_png(fig, f"COMBINED_{color}_{k}")
+    pdf_images.append((k, img_path))
+# =========================
+# EXPORT PDF (AUDIT / REPORT)
+# =========================
+pdf_buf = export_pdf_report(
+    color,
+    year,
+    summary_line_df,
+    summary_lab_df,
+    pdf_images
+)
+
+st.download_button(
+    "⬇ Download SPC Audit PDF",
+    data=pdf_buf,
+    file_name=f"SPC_Report_{color}_{year}.pdf",
+    mime="application/pdf"
+)
+
     download(fig, f"COMBINED_{color}_{k}.png")
 
     pdf_figs.append(fig)   # 👈 DÒNG QUAN TRỌNG
@@ -919,6 +946,7 @@ st.download_button(
     file_name="SPC_Distribution_Report.pdf",
     mime="application/pdf"
 )
+
 
 
 
