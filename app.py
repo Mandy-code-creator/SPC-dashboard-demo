@@ -285,89 +285,65 @@ with col2:
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    # ===== LAB =====
-    x_lab = lab["製造批號"]
-    y_lab = lab["value"]
-    LCL_lab, UCL_lab = lab_lim
+    mean = line["value"].mean()
+    std = line["value"].std()
 
-    if LCL_lab is not None and UCL_lab is not None:
-        out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
-    else:
-        out_lab = np.zeros(len(y_lab), dtype=bool)
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+    x_lab = lab["製造批號"]y_lab = lab["value"]LCL_lab, UCL_lab = lab_lim
 
-    ax.plot(x_lab[~out_lab], y_lab[~out_lab], "o-", color="#1f77b4", label="LAB")
-    ax.scatter(x_lab[out_lab], y_lab[out_lab], color="red", s=90, zorder=5, label="LAB Out")
+if LCL_lab is not None and UCL_lab is not None:
+    out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
+    ax.scatter(x_lab[out_lab], y_lab[out_lab], color="red", s=80, zorder=5)
 
-    # ===== LINE =====
-    x_line = line["製造批號"]
-    y_line = line["value"]
-    LCL_line, UCL_line = line_lim
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
-    if LCL_line is not None and UCL_line is not None:
-        out_line = (y_line > UCL_line) | (y_line < LCL_line)
-    else:
-        out_line = np.zeros(len(y_line), dtype=bool)
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
 
-    ax.plot(x_line[~out_line], y_line[~out_line], "o-", color="#2ca02c", label="LINE")
-    ax.scatter(x_line[out_line], y_line[out_line], color="red", s=90, zorder=5, label="LINE Out")
-
-    # ===== LIMITS =====
-    if LCL_lab is not None:
-        ax.axhline(LCL_lab, color="#1f77b4", linestyle=":")
-        ax.axhline(UCL_lab, color="#1f77b4", linestyle=":")
-
-    if LCL_line is not None:
-        ax.axhline(LCL_line, color="red")
-        ax.axhline(UCL_line, color="red")
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red", label="LINE LCL")
+        ax.axhline(line_lim[1], color="red", label="LINE UCL")
 
     ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.subplots_adjust(right=0.78)
-
     return fig
-
 
 
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    y = spc["value"]
-    x = spc["製造批號"]
+    mean = spc["value"].mean()
+    std = spc["value"].std()
 
-    LCL, UCL = limit
+    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
+    # highlight out-of-limit points
+x = spc["製造批號"]
+y = spc["value"]
+LCL, UCL = limit
 
-    if LCL is not None and UCL is not None:
-        out = (y > UCL) | (y < LCL)
-    else:
-        out = np.zeros(len(y), dtype=bool)
+if LCL is not None and UCL is not None:
+    out = (y > UCL) | (y < LCL)
+    ax.scatter(x[out], y[out], color="red", s=80, zorder=5)
 
-    # Normal points
-    ax.plot(x[~out], y[~out], "o-", color=color, label="Normal")
-
-    # Out of control points
-    ax.scatter(x[out], y[out], color="red", s=90, zorder=5, label="Out of Limit")
-
-    # 3-sigma (optional – giữ nguyên)
-    mean = y.mean()
-    std = y.std()
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
-    # Control limits
-    if LCL is not None:
-        ax.axhline(LCL, color="red", label="LCL")
-        ax.axhline(UCL, color="red", label="UCL")
+    if limit[0] is not None:
+        ax.axhline(limit[0], color="red", label="LCL")
+        ax.axhline(limit[1], color="red", label="UCL")
 
     ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.subplots_adjust(right=0.78)
-
     return fig
-
 
 
 def download(fig, name):
