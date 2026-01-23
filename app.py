@@ -760,206 +760,93 @@ else:
 
 # =========================================================
 # 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
-# =========================================================
-import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-
-# =====================================
-# PAGE CONFIG
-# =====================================
-st.set_page_config(
-    page_title="Cross-Web Thickness SPC",
-    layout="wide"
-)
-
-# =====================================
-# LOAD DATA
-# 👉 NẾU APP LỚN ĐÃ CÓ df → XÓA TOÀN BỘ PHẦN NÀY
-# =====================================
-@st.cache_data
-def load_data():
-    # ⚠️ thay bằng nguồn dữ liệu thật của bạn
-    df = pd.read_csv("your_data.csv")
-    df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
-    return df
-
-try:
-    df
-except NameError:
-    df = load_data()
-
-# =====================================
-# CROSS-WEB THICKNESS SPC (BOTTOM)
-# ======================================================
-# 🔻 CROSS-WEB THICKNESS SPC (BOTTOM – PER COIL)
-# ======================================================
-
-import numpy as np
-import matplotlib.pyplot as plt
+import streamlit as st
 
 st.markdown("---")
-st.subheader("🔻 Cross-Web Thickness SPC (per Coil)")
+st.header("📏 Cross-Web Thickness SPC (per Coil)")
+st.caption("Average coating thickness only – grouped by Coil No")
 
-# ======================================================
-# 1️⃣ REQUIRED COLUMNS CHECK
-# ======================================================
-req_cols = [
-    "Coil No.",
-    "Time",
-    "Coating Thickness (N)",
-    "Coating Thickness (S)"
-]
+# =========================
+# 1. CHECK REQUIRED COLUMNS
+# =========================
+required_cols = ["Coil No", "Time", "Avergage Thickness"]
+missing = [c for c in required_cols if c not in df.columns]
 
-missing = [c for c in req_cols if c not in df.columns]
 if missing:
     st.error(f"❌ Missing required columns: {missing}")
     st.stop()
 
-# ======================================================
-# 2️⃣ TIME → MONTH FILTER (ONLY FOR SELECTION)
-# ======================================================
-df_cw = df.copy()
-df_cw["Time"] = pd.to_datetime(df_cw["Time"], errors="coerce")
-df_cw = df_cw.dropna(subset=["Time"])
+# =========================
+# 2. PREPARE DATA
+# =========================
+df_plot = df.copy()
 
-df_cw["YearMonth"] = df_cw["Time"].dt.to_period("M").astype(str)
-months = sorted(df_cw["YearMonth"].unique())
+df_plot["Time"] = pd.to_datetime(df_plot["Time"], errors="coerce")
+df_plot = df_plot.dropna(subset=["Time", "Avergage Thickness", "Coil No"])
 
-selected_month = st.selectbox(
-    "📅 Select production month (Cross-Web analysis)",
-    months,
-    index=len(months) - 1
-)
+# =========================
+# 3. MONTH FILTER
+# =========================
+df_plot["Month"] = df_plot["Time"].dt.to_period("M").astype(str)
 
-df_cw = df_cw[df_cw["YearMonth"] == selected_month]
+month_list = sorted(df_plot["Month"].unique())
+selected_month = st.selectbox("📅 Select month", month_list)
 
-if df_cw.empty:
-    st.warning("⚠️ No data available for selected month")
-    st.stop()
+df_plot = df_plot[df_plot["Month"] == selected_month]
 
-# ======================================================
-# 3️⃣ GROUP BY COIL (CORE LOGIC)
-# ======================================================
+# =========================
+# 4. GROUP BY COIL
+# =========================
 coil_df = (
-    df_cw
-    .groupby("Coil No.", as_index=False)
-    .agg(
-        Mean_N=("Coating Thickness (N)", "mean"),
-        Mean_S=("Coating Thickness (S)", "mean")
-    )
+    df_plot
+    .groupby("Coil No", as_index=False)
+    .agg({"Avergage Thickness": "mean"})
 )
 
-coil_df["Cross_Web"] = coil_df["Mean_N"] - coil_df["Mean_S"]
+coil_df = coil_df.sort_values("Coil No")
 
-coil_df = coil_df.reset_index(drop=True)
-coil_df["Coil_Seq"] = coil_df.index + 1
-
-# ======================================================
-# 4️⃣ SPC CALCULATION
-# ======================================================
-cl = coil_df["Cross_Web"].mean()
-std = coil_df["Cross_Web"].std()
-
-ucl = cl + 3 * std
-lcl = cl - 3 * std
-
-coil_df["OOC"] = (coil_df["Cross_Web"] > ucl) | (coil_df["Cross_Web"] < lcl)
-
-# ======================================================
-# 5️⃣ SPC CHART (PER COIL)
-# ======================================================
+# =========================
+# 5. BAR CHART – EASY TO READ
+# =========================
 fig, ax = plt.subplots(figsize=(14, 4))
 
-normal = coil_df[~coil_df["OOC"]]
-ooc = coil_df[coil_df["OOC"]]
+ax.bar(
+    coil_df["Coil No"].astype(str),
+    coil_df["Avergage Thickness"]
+)
 
-ax.scatter(normal["Coil_Seq"], normal["Cross_Web"], s=60, label="In control")
-ax.scatter(ooc["Coil_Seq"], ooc["Cross_Web"], s=80, marker="x", label="Out of control")
+mean_val = coil_df["Avergage Thickness"].mean()
 
-ax.plot(coil_df["Coil_Seq"], coil_df["Cross_Web"], alpha=0.4)
+ax.axhline(
+    mean_val,
+    linestyle="--",
+    linewidth=2,
+    label=f"Mean = {mean_val:.2f}"
+)
 
-ax.axhline(cl, linestyle="--", linewidth=2, label="Center Line")
-ax.axhline(ucl, color="red", linestyle="--", label="UCL")
-ax.axhline(lcl, color="red", linestyle="--", label="LCL")
-ax.axhline(0, color="black", linewidth=1)
+ax.set_title("Average Coating Thickness by Coil")
+ax.set_xlabel("Coil No")
+ax.set_ylabel("Average Thickness (µm)")
+ax.legend()
 
-ax.set_xlabel("Coil sequence (within month)")
-ax.set_ylabel("Cross-Web Thickness (N − S) µm")
-ax.set_title(f"Cross-Web Thickness SPC – {selected_month}")
-ax.grid(True)
-ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-
+plt.xticks(rotation=90)
 st.pyplot(fig)
 
-# ======================================================
-# 6️⃣ DISTRIBUTION CHART
-# ======================================================
-st.markdown("### 📊 Cross-Web Thickness Distribution")
+# =========================
+# 6. DISTRIBUTION STATUS
+# =========================
+st.subheader("📊 Thickness Distribution")
 
-values = coil_df["Cross_Web"].dropna()
+fig2, ax2 = plt.subplots(figsize=(6, 4))
+ax2.hist(coil_df["Avergage Thickness"], bins=10)
+ax2.set_xlabel("Average Thickness (µm)")
+ax2.set_ylabel("Number of Coils")
+ax2.set_title("Distribution of Average Thickness")
 
-if len(values) < 5:
-    st.warning("⚠️ Not enough coils for distribution analysis")
-else:
-    mean = values.mean()
-    std = values.std()
+st.pyplot(fig2)
 
-    fig2, ax2 = plt.subplots(figsize=(6, 4))
-
-    bins = np.histogram_bin_edges(values, bins=10)
-    counts, _, patches = ax2.hist(
-        values,
-        bins=bins,
-        edgecolor="white",
-        alpha=0.85
-    )
-
-    # Highlight bins outside control
-    for p, l, r in zip(patches, bins[:-1], bins[1:]):
-        center = (l + r) / 2
-        if center > ucl or center < lcl:
-            p.set_facecolor("#ff6b6b")
-
-    # Normal curve
-    if std > 0:
-        x = np.linspace(mean - 4 * std, mean + 4 * std, 400)
-        pdf = (1 / (std * np.sqrt(2 * np.pi))) * np.exp(
-            -0.5 * ((x - mean) / std) ** 2
-        )
-        ax2.plot(
-            x,
-            pdf * len(values) * (bins[1] - bins[0]),
-            color="black",
-            linewidth=2,
-            label="Normal fit"
-        )
-
-    ax2.axvline(0, color="black", linewidth=1.5, label="Balanced (N = S)")
-    ax2.axvline(mean, linestyle="--", linewidth=2, label="Mean")
-    ax2.axvline(ucl, color="red", linestyle="--", label="UCL")
-    ax2.axvline(lcl, color="red", linestyle="--", label="LCL")
-
-    ax2.text(
-        0.98, 0.95,
-        f"Coils = {len(values)}\n"
-        f"Mean = {mean:.2f} µm\n"
-        f"Std = {std:.2f} µm",
-        transform=ax2.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        bbox=dict(facecolor="white", alpha=0.9)
-    )
-
-    ax2.set_xlabel("Cross-Web Thickness (N − S) µm")
-    ax2.set_ylabel("Number of coils")
-    ax2.set_title(f"Cross-Web Distribution – {selected_month}")
-    ax2.grid(axis="y", alpha=0.3)
-    ax2.legend(fontsize=8)
-
-    st.pyplot(fig2)
 
 
 
