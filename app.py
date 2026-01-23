@@ -4,11 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import numpy as np
 import math
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
-)
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
+
 from reportlab.lib.units import cm
 
 # =========================
@@ -841,6 +837,7 @@ def export_spc_pdf(spc, color):
     doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 
