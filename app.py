@@ -770,6 +770,8 @@ st.header("🎨 Cross-Web Thickness SPC (Coil-based)")
 # =========================
 # REQUIRED COLUMNS CHECK
 # =========================
+df_raw = df.copy()
+
 req_cols = [
     "Coil No.", "塗料編號", "Time",
     "Coating Thickness 正面",
@@ -895,6 +897,7 @@ st.dataframe(
     }),
     use_container_width=True
 )
+
 
 
 
