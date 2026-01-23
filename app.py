@@ -527,30 +527,23 @@ for i, k in enumerate(spc):
 
         df = pd.DataFrame({"value": values})
 
-        # ===== Histogram (hover + out-of-spec color)
-        hist = alt.Chart(df).transform_bin(
-            "bin", field="value", maxbins=10
-        ).transform_aggregate(
-            count="count()",
-            groupby=["bin", "bin_end"]
-        ).transform_calculate(
-            status=
-            f"datum.bin < {lcl} || datum.bin_end > {ucl} ? 'OOS' : 'OK'"
-            if lcl is not None and ucl is not None else "'OK'"
-        ).mark_bar().encode(
-            x=alt.X("bin:Q", title="Value"),
-            x2="bin_end:Q",
-            y=alt.Y("count:Q", title="Count"),
-            color=alt.Color(
-                "status:N",
-                scale=alt.Scale(domain=["OK", "OOS"], range=["#4dabf7", "red"]),
-                legend=None
+        # ===== Histogram (Altair v5+ SAFE)
+        hist = alt.Chart(df).mark_bar().encode(
+            x=alt.X(
+                "value:Q",
+                bin=alt.Bin(maxbins=10),
+                title="Value"
+            ),
+            y=alt.Y("count()", title="Count"),
+            color=alt.condition(
+                alt.datum.value < lcl or alt.datum.value > ucl
+                if lcl is not None and ucl is not None else alt.value(False),
+                alt.value("red"),
+                alt.value("#4dabf7")
             ),
             tooltip=[
-                alt.Tooltip("bin:Q", title="From", format=".3f"),
-                alt.Tooltip("bin_end:Q", title="To", format=".3f"),
-                alt.Tooltip("count:Q", title="Count"),
-                alt.Tooltip("status:N", title="Status")
+                alt.Tooltip("value:Q", title="Value", format=".3f"),
+                alt.Tooltip("count()", title="Count")
             ]
         ).properties(
             width=280,
@@ -563,16 +556,18 @@ for i, k in enumerate(spc):
             y = (
                 (1 / (std * np.sqrt(2 * np.pi))) *
                 np.exp(-0.5 * ((x - mean) / std) ** 2)
-            ) * len(values) * (values.max() - values.min()) / 10
+            )
 
             normal_df = pd.DataFrame({"x": x, "y": y})
 
-            normal = alt.Chart(normal_df).mark_line(color="black").encode(
+            normal = alt.Chart(normal_df).mark_line(
+                color="black"
+            ).encode(
                 x="x:Q",
-                y="y:Q",
+                y=alt.Y("y:Q", title="Density"),
                 tooltip=[
                     alt.Tooltip("x:Q", title="Value", format=".3f"),
-                    alt.Tooltip("y:Q", title="Density", format=".3f")
+                    alt.Tooltip("y:Q", title="Density", format=".4f")
                 ]
             )
         else:
@@ -580,7 +575,7 @@ for i, k in enumerate(spc):
 
         st.altair_chart(hist + normal, use_container_width=True)
 
-        # ===== Capability box (text)
+        # ===== Capability box
         if cp is not None:
             st.markdown(
                 f"""
@@ -692,6 +687,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
