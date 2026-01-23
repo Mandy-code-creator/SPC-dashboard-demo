@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 
 # =========================
@@ -120,7 +118,7 @@ r = group.max() - group.min()
 xbar_bar = xbar.mean()
 r_bar = r.mean()
 
-# SPC constants (n≈5)
+# SPC constants (n ≈ 5)
 A2 = 0.577
 D3 = 0
 D4 = 2.114
@@ -170,9 +168,9 @@ Cpk = min(
     (mu - LSL) / (3 * sigma)
 )
 
-colA, colB = st.columns(2)
-colA.metric("Cp", f"{Cp:.2f}")
-colB.metric("Cpk", f"{Cpk:.2f}")
+c1, c2 = st.columns(2)
+c1.metric("Cp", f"{Cp:.2f}")
+c2.metric("Cpk", f"{Cpk:.2f}")
 
 # Normal PDF (NO SCIPY)
 x = np.linspace(mu - 4*sigma, mu + 4*sigma, 300)
@@ -190,29 +188,25 @@ ax.grid(True)
 st.pyplot(fig2)
 
 # =========================
-# EXPORT PDF
+# EXPORT CSV / EXCEL (SAFE)
 # =========================
-st.subheader("📄 Export SPC PDF")
+st.subheader("📤 Export Data")
 
-def export_pdf():
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf)
-    styles = getSampleStyleSheet()
-    story = []
+csv = df.to_csv(index=False).encode("utf-8-sig")
+st.download_button(
+    "⬇️ Download filtered CSV",
+    csv,
+    "SPC_Data.csv",
+    "text/csv"
+)
 
-    story.append(Paragraph("SPC Report", styles["Title"]))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph(f"Metric: {metric}", styles["Normal"]))
-    story.append(Paragraph(f"Cp: {Cp:.2f}", styles["Normal"]))
-    story.append(Paragraph(f"Cpk: {Cpk:.2f}", styles["Normal"]))
-
-    doc.build(story)
-    buf.seek(0)
-    return buf
+excel_buffer = BytesIO()
+with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+    df.to_excel(writer, index=False, sheet_name="SPC_Data")
 
 st.download_button(
-    "📥 Download SPC PDF",
-    export_pdf(),
-    file_name="SPC_Report.pdf",
-    mime="application/pdf"
+    "⬇️ Download Excel",
+    excel_buffer.getvalue(),
+    "SPC_Data.xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
