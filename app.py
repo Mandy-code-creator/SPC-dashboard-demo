@@ -167,12 +167,6 @@ def prep_lab(df, col):
         Time=("Time", "min"),
         value=(col, "mean")
     )
-def add_ooc(df, lcl, ucl):
-    df = df.copy()
-    df["OOC"] = False
-    if lcl is not None and ucl is not None:
-        df["OOC"] = (df["value"] < lcl) | (df["value"] > ucl)
-    return df
 
 # =========================
 # SPC DATA
@@ -191,14 +185,6 @@ spc = {
         "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
     }
 }
-for k in spc:
-    # LINE
-    lcl, ucl = get_limit(color, k, "LINE")
-    spc[k]["line"] = add_ooc(spc[k]["line"], lcl, ucl)
-
-    # LAB
-    lcl, ucl = get_limit(color, k, "LAB")
-    spc[k]["lab"] = add_ooc(spc[k]["lab"], lcl, ucl)
 
 # =========================
 # MAIN DASHBOARD
@@ -300,55 +286,39 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
 
     # ===== LAB =====
-    lab_ok = lab[~lab["OOC"]]
-    lab_bad = lab[lab["OOC"]]
+    x_lab = lab["製造批號"]
+    y_lab = lab["value"]
+    LCL_lab, UCL_lab = lab_lim
 
-    ax.plot(
-        lab_ok["製造批號"],
-        lab_ok["value"],
-        "o-",
-        label="LAB",
-        color="#1f77b4"
-    )
+    if LCL_lab is not None and UCL_lab is not None:
+        out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
+    else:
+        out_lab = np.zeros(len(y_lab), dtype=bool)
 
-    ax.scatter(
-        lab_bad["製造批號"],
-        lab_bad["value"],
-        color="red",
-        s=90,
-        label="LAB OOC",
-        zorder=5
-    )
+    ax.plot(x_lab[~out_lab], y_lab[~out_lab], "o-", color="#1f77b4", label="LAB")
+    ax.scatter(x_lab[out_lab], y_lab[out_lab], color="red", s=90, zorder=5, label="LAB Out")
 
     # ===== LINE =====
-    line_ok = line[~line["OOC"]]
-    line_bad = line[line["OOC"]]
+    x_line = line["製造批號"]
+    y_line = line["value"]
+    LCL_line, UCL_line = line_lim
 
-    ax.plot(
-        line_ok["製造批號"],
-        line_ok["value"],
-        "o-",
-        label="LINE",
-        color="#2ca02c"
-    )
+    if LCL_line is not None and UCL_line is not None:
+        out_line = (y_line > UCL_line) | (y_line < LCL_line)
+    else:
+        out_line = np.zeros(len(y_line), dtype=bool)
 
-    ax.scatter(
-        line_bad["製造批號"],
-        line_bad["value"],
-        color="red",
-        s=90,
-        label="LINE OOC",
-        zorder=5
-    )
+    ax.plot(x_line[~out_line], y_line[~out_line], "o-", color="#2ca02c", label="LINE")
+    ax.scatter(x_line[out_line], y_line[out_line], color="red", s=90, zorder=5, label="LINE Out")
 
-    # ===== LIMIT =====
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
+    # ===== LIMITS =====
+    if LCL_lab is not None:
+        ax.axhline(LCL_lab, color="#1f77b4", linestyle=":")
+        ax.axhline(UCL_lab, color="#1f77b4", linestyle=":")
 
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red")
-        ax.axhline(line_lim[1], color="red")
+    if LCL_line is not None:
+        ax.axhline(LCL_line, color="red")
+        ax.axhline(UCL_line, color="red")
 
     ax.set_title(title)
     ax.grid(True)
@@ -359,34 +329,45 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     return fig
 
 
+
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    ok = spc[~spc["OOC"]]
-    bad = spc[spc["OOC"]]
+    y = spc["value"]
+    x = spc["製造批號"]
 
-    # batch bình thường
-    ax.plot(ok["製造批號"], ok["value"], "o-", color=color)
+    LCL, UCL = limit
 
-    # 🔴 batch lệch màu
-    ax.scatter(
-        bad["製造批號"],
-        bad["value"],
-        color="red",
-        s=100,
-        label="Out of control"
-    )
+    if LCL is not None and UCL is not None:
+        out = (y > UCL) | (y < LCL)
+    else:
+        out = np.zeros(len(y), dtype=bool)
 
-    # LCL / UCL
-    if limit[0] is not None:
-        ax.axhline(limit[0], color="red", linestyle="--")
-        ax.axhline(limit[1], color="red", linestyle="--")
+    # Normal points
+    ax.plot(x[~out], y[~out], "o-", color=color, label="Normal")
+
+    # Out of control points
+    ax.scatter(x[out], y[out], color="red", s=90, zorder=5, label="Out of Limit")
+
+    # 3-sigma (optional – giữ nguyên)
+    mean = y.mean()
+    std = y.std()
+    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
+    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+
+    # Control limits
+    if LCL is not None:
+        ax.axhline(LCL, color="red", label="LCL")
+        ax.axhline(UCL, color="red", label="UCL")
 
     ax.set_title(title)
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
-    ax.legend()
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.subplots_adjust(right=0.78)
+
     return fig
+
 
 
 def download(fig, name):
@@ -529,8 +510,6 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
-
-
 
 
 
