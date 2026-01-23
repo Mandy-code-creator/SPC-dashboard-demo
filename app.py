@@ -5,8 +5,6 @@ import io
 import numpy as np
 import math
 
-from reportlab.lib.units import cm
-
 # =========================
 # PAGE CONFIG
 # =========================
@@ -837,6 +835,7 @@ def export_spc_pdf(spc, color):
     doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 
