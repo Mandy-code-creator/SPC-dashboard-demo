@@ -761,13 +761,14 @@ else:
 # ======================================================
 
 st.markdown("---")
-st.markdown("## 📏 Cross-Web Thickness & Color SPC (LINE)")
+st.markdown("## 📏 Cross-Web Thickness SPC & Color Relation (LINE)")
 st.caption(
-    "Analyze coating thickness variation and its impact on color deviation (LINE only)"
+    "Monitor coating thickness variation and its impact on color deviation "
+    "(Target thickness = 25 µm, including primer layer)"
 )
 
 # =========================
-# SOURCE DATA (USE df)
+# SOURCE DATA
 # =========================
 source_df = df.copy()
 
@@ -781,16 +782,17 @@ required_cols = [
     "正-北 Δb", "正-南 Δb",
 ]
 
-missing = [c for c in required_cols if c not in source_df.columns]
-if missing:
-    st.error(f"❌ Missing columns: {missing}")
+missing_cols = [c for c in required_cols if c not in source_df.columns]
+if missing_cols:
+    st.error(f"❌ Missing required columns: {missing_cols}")
     st.stop()
 
 # =========================
-# DATA PREP
+# DATA PREPARATION
 # =========================
 cd_df = source_df.dropna(subset=required_cols).copy()
 
+# Thickness
 cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
 cd_df["CD Thickness Diff"] = (
     cd_df["Coating Thickness 正面 - 北"]
@@ -798,22 +800,145 @@ cd_df["CD Thickness Diff"] = (
 )
 cd_df["CD Uniformity"] = cd_df["CD Thickness Diff"].abs()
 
-# LINE color deviation (avg North/South)
+# LINE color (North & South average)
 cd_df["ΔL_LINE"] = cd_df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
 cd_df["Δa_LINE"] = cd_df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
 cd_df["Δb_LINE"] = cd_df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
 # =========================
-# SPC FUNCTION
+# SPC PLOT FUNCTION
 # =========================
 def plot_spc(df, value_col, title, target=None, ylabel="µm"):
     mean = df[value_col].mean()
     std = df[value_col].std()
 
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(df["製造批號"], df[value_col], "o-", linewidth=2)
 
-    ax.axhline(mean, linestyle=":", linewidth=2, label="Me
+    ax.plot(
+        df["製造批號"],
+        df[value_col],
+        "o-",
+        linewidth=2
+    )
+
+    # Mean
+    ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
+
+    # Target
+    if target is not None:
+        ax.axhline(
+            target,
+            linestyle="--",
+            linewidth=2,
+            label=f"Target = {target}"
+        )
+
+    # 3 Sigma
+    if std > 0 and not np.isnan(std):
+        ucl = mean + 3 * std
+        lcl = mean - 3 * std
+
+        ax.axhline(ucl, linestyle="--", label="+3σ")
+        ax.axhline(lcl, linestyle="--", label="-3σ")
+
+        ooc = (df[value_col] > ucl) | (df[value_col] < lcl)
+        ax.scatter(
+            df.loc[ooc, "製造批號"],
+            df.loc[ooc, value_col],
+            s=90,
+            zorder=5,
+            label="OOC"
+        )
+
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.subplots_adjust(right=0.78)
+
+    st.pyplot(fig)
+
+# =========================
+# 1️⃣ THICKNESS SPC
+# =========================
+plot_spc(
+    cd_df,
+    "CD Avg Thickness",
+    "CD Average Thickness (Target = 25 µm)",
+    target=25
+)
+
+plot_spc(
+    cd_df,
+    "CD Thickness Diff",
+    "CD Thickness Difference (North - South)",
+    target=0
+)
+
+plot_spc(
+    cd_df,
+    "CD Uniformity",
+    "CD Thickness Uniformity |North - South|"
+)
+
+# =========================
+# 2️⃣ THICKNESS ↔ COLOR RELATION
+# =========================
+st.markdown("### 🎨 Thickness vs Color Deviation (LINE)")
+
+def scatter_relation(x, y, xlabel, ylabel, title):
+    fig, ax = plt.subplots(figsize=(5, 4))
+
+    ax.scatter(x, y, alpha=0.75)
+    ax.grid(alpha=0.3)
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    # Correlation
+    if len(x) > 2:
+        corr = np.corrcoef(x, y)[0, 1]
+        ax.text(
+            0.05, 0.95,
+            f"r = {corr:.2f}",
+            transform=ax.transAxes,
+            va="top",
+            bbox=dict(facecolor="white", alpha=0.8)
+        )
+
+    st.pyplot(fig)
+
+cols = st.columns(3)
+
+with cols[0]:
+    scatter_relation(
+        cd_df["CD Avg Thickness"],
+        cd_df["ΔL_LINE"],
+        "Avg Thickness (µm)",
+        "ΔL",
+        "Thickness vs ΔL"
+    )
+
+with cols[1]:
+    scatter_relation(
+        cd_df["CD Thickness Diff"],
+        cd_df["Δa_LINE"],
+        "Thickness Diff (N - S)",
+        "Δa",
+        "Thickness Diff vs Δa"
+    )
+
+with cols[2]:
+    scatter_relation(
+        cd_df["CD Thickness Diff"],
+        cd_df["Δb_LINE"],
+        "Thickness Diff (N - S)",
+        "Δb",
+        "Thickness Diff vs Δb"
+    )
+
 
 
 
