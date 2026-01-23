@@ -1,183 +1,83 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import io
 import numpy as np
-import math
 
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="SPC Color Dashboard",
-    page_icon="🎨",
+    page_title="Batch LAB Summary",
     layout="wide"
 )
 
 # =========================
 # LOAD DATA
 # =========================
-@st.cache_data(ttl=300)
+@st.cache_data
 def load_data():
-    df = pd.read_csv(DATA_URL)
-    df["Time"] = pd.to_datetime(df["Time"])
-    return df
-
-@st.cache_data(ttl=300)
-def load_limit():
-    return pd.read_csv(LIMIT_URL)
-
-# =========================
-# GOOGLE SHEET LINKS
-# =========================
-DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
-LIMIT_URL = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
+    url = "PASTE_YOUR_CSV_URL_HERE"
+    return pd.read_csv(url)
 
 df = load_data()
-limit_df = load_limit()
+
+st.title("📦 Batch LAB Summary")
 
 # =========================
-# FIX COLUMN NAMES
+# CLEAN & CALC PER COIL
 # =========================
-df.columns = (
-    df.columns
-    .str.replace("\r\n", " ", regex=False)
-    .str.replace("\n", " ", regex=False)
-    .str.replace("　", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-    .str.strip()
-)
-
-# =========================
-# SIDEBAR FILTER
-# =========================
-color = st.sidebar.selectbox("Color code", sorted(df["塗料編號"].dropna().unique()))
-df = df[df["塗料編號"] == color]
-
-# =========================
-# LIMIT FUNCTION
-# =========================
-def get_limit(color, prefix, factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None, None
-    return (
-        row.get(f"{factor} {prefix} LCL", [None]).values[0],
-        row.get(f"{factor} {prefix} UCL", [None]).values[0]
-    )
-
-# =====================================================
-# 🔴 CHỈ PHẦN DƯỚI ĐÂY ĐƯỢC SỬA – LOGIC ĐÚNG
-# =====================================================
-
-# 1 cuộn = 1 dòng
-# 1 cuộn = mean(Bắc, Nam)
-# 1 batch = mean(các cuộn)
-
-def prep_spc(df, north, south):
-    tmp = df[[ "製造批號", north, south ]].dropna()
-    tmp["value"] = tmp[[north, south]].mean(axis=1)
-
-    # batch = trung bình các cuộn
-    return tmp.groupby("製造批號", as_index=False).agg(
-        value=("value", "mean")
-    )
-
-
-def prep_lab(df, col):
-    tmp = df[[ "製造批號", col ]].dropna()
-
-    return tmp.groupby("製造批號", as_index=False).agg(
-        value=(col, "mean")
-    )
-
-# =========================
-# SPC DATA
-# =========================
-spc = {
-    "ΔL": {
-        "lab": prep_lab(df, "入料檢測 ΔL 正面"),
-        "line": prep_spc(df, "正-北 ΔL", "正-南 ΔL")
-    },
-    "Δa": {
-        "lab": prep_lab(df, "入料檢測 Δa 正面"),
-        "line": prep_spc(df, "正-北 Δa", "正-南 Δa")
-    },
-    "Δb": {
-        "lab": prep_lab(df, "入料檢測 Δb 正面"),
-        "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
-    }
-}
-
-# =========================
-# SUMMARY TABLE
-# =========================
-summary_line = []
-summary_lab = []
-
-for k in spc:
-    line_vals = spc[k]["line"]["value"]
-    lab_vals = spc[k]["lab"]["value"]
-
-    summary_line.append({
-        "Factor": k,
-        "Min": round(line_vals.min(), 2),
-        "Max": round(line_vals.max(), 2),
-        "Mean": round(line_vals.mean(), 2),
-        "Std Dev": round(line_vals.std(), 2),
-        "n": line_vals.count()
-    })
-
-    summary_lab.append({
-        "Factor": k,
-        "Min": round(lab_vals.min(), 2),
-        "Max": round(lab_vals.max(), 2),
-        "Mean": round(lab_vals.mean(), 2),
-        "Std Dev": round(lab_vals.std(), 2),
-        "n": lab_vals.count()
-    })
-
-st.markdown("### 📋 SPC Summary Statistics")
-
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown("#### 🏭 LINE")
-    st.dataframe(pd.DataFrame(summary_line), hide_index=True)
-
-with c2:
-    st.markdown("#### 🧪 LAB")
-    st.dataframe(pd.DataFrame(summary_lab), hide_index=True)
-def batch_line_lab(df):
+def calc_per_coil(df):
     tmp = df[[
         "製造批號",
         "正-北 ΔL", "正-南 ΔL",
         "正-北 Δa", "正-南 Δa",
         "正-北 Δb", "正-南 Δb"
-    ]].dropna()
+    ]].copy()
 
-    # mỗi cuộn = mean Bắc / Nam
-    tmp["ΔL"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
-    tmp["Δa"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
-    tmp["Δb"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+    # drop nếu thiếu đo
+    tmp = tmp.dropna()
 
-    # mỗi batch = mean các cuộn
-    return (
-        tmp.groupby("製造批號")[["ΔL", "Δa", "Δb"]]
-        .mean()
-        .round(2)
-        .reset_index()
+    # mỗi cuộn = trung bình Bắc / Nam
+    tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+    tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+    tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+
+    return tmp[["製造批號", "L", "a", "b"]]
+
+coil_df = calc_per_coil(df)
+
+# =========================
+# BATCH SUMMARY
+# =========================
+batch_df = (
+    coil_df
+    .groupby("製造批號")
+    .agg(
+        L_mean=("L", "mean"),
+        a_mean=("a", "mean"),
+        b_mean=("b", "mean"),
+        L_std=("L", "std"),
+        a_std=("a", "std"),
+        b_std=("b", "std"),
+        L_min=("L", "min"),
+        a_min=("a", "min"),
+        b_min=("b", "min"),
+        L_max=("L", "max"),
+        a_max=("a", "max"),
+        b_max=("b", "max"),
+        coil_count=("L", "count")
     )
-st.markdown("## 📦 Batch Color Table")
+    .round(2)
+    .reset_index()
+)
 
-col1, col2 = st.columns(2)
+# =========================
+# DISPLAY
+# =========================
+st.subheader("🔹 Batch LAB Table")
+st.dataframe(batch_df, use_container_width=True)
 
-with col1:
-    st.markdown("### 🏭 LINE (Production)")
-    df_batch_line = batch_line_lab(df)
-    st.dataframe(df_batch_line, use_container_width=True)
-
-with col2:
-    st.markdown("### 🧪 LAB (Incoming)")
-    df_batch_lab = batch_lab(df)
-    st.dataframe(df_batch_lab, use_container_width=True)
-
+# =========================
+# DEBUG (OPTIONAL)
+# =========================
+with st.expander("🔍 Debug – coil level"):
+    st.dataframe(coil_df, use_container_width=True)
