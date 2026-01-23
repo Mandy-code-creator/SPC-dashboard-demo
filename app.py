@@ -470,7 +470,7 @@ def calc_capability(values, lcl, ucl):
     ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
 
     # Short-term batch data
-    ppk = cpk
+    cpk
 
     return round(ca, 2), round(cp, 2), round(cpk, 2), round(ppk, 2)
 
@@ -496,7 +496,7 @@ for i, k in enumerate(spc):
         std = values.std(ddof=1)
         lcl, ucl = get_limit(color, k, "LINE")
 
-        ca, cp, cpk, ppk = calc_capability(values, lcl, ucl)
+        ca, cp, cpk = calc_capability(values, lcl, ucl)
 
         fig, ax = plt.subplots(figsize=(4, 3))
 
@@ -558,7 +558,7 @@ for i, k in enumerate(spc):
         std = values.std(ddof=1)
         lcl, ucl = get_limit(color, k, "LAB")
 
-        ca, cp, cpk, ppk = calc_capability(values, lcl, ucl)
+        ca, cp, cpk = calc_capability(values, lcl, ucl)
 
         fig, ax = plt.subplots(figsize=(4, 3))
 
@@ -594,7 +594,7 @@ for i, k in enumerate(spc):
         if cp is not None:
             ax.text(
                 0.98, 0.95,
-                f"Ca={ca}\nCp={cp}\nCpk={cpk}\nPpk={ppk}",
+                f"Ca={ca}\nCp={cp}\nCpk={cpk}",
                 transform=ax.transAxes,
                 ha="right",
                 va="top",
@@ -645,6 +645,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
