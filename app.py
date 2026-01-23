@@ -556,6 +556,30 @@ for i, k in enumerate(spc):
         ax.legend(fontsize=8)
 
         st.pyplot(fig)
+# =========================
+# CAPABILITY (Ca / Cp / Cpk)
+# =========================
+ca, cp, cpk = calc_capability(values, lcl, ucl)
+
+if cp is not None:
+    status = "OK" if cpk >= 1.33 else "⚠ Check"
+
+    ax.text(
+        0.98, 0.95,
+        f"Ca  = {ca}\n"
+        f"Cp  = {cp}\n"
+        f"Cpk = {cpk}\n"
+        f"Status: {status}",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=9,
+        bbox=dict(
+            facecolor="#e7f5ff" if cpk >= 1.33 else "#fff3bf",
+            edgecolor="black",
+            alpha=0.9
+        )
+    )
 
         # =========================
         # DOWNLOAD IMAGE
@@ -695,6 +719,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
