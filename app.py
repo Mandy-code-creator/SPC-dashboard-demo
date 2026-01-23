@@ -301,7 +301,7 @@ summary_lab_df = pd.DataFrame(summary_lab)
 # =========================
 # DISPLAY SIDE BY SIDE
 # =========================
-st.markdown("### 📋 SPC Summary Statistics")
+st.markdown("### 📋 Summary Statistics")
 
 col1, col2 = st.columns(2)
 
@@ -640,6 +640,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
