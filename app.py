@@ -760,135 +760,193 @@ else:
 
 # =========================================================
 # 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
-import pandas as pd
-import matplotlib.pyplot as plt
-import streamlit as st
+# =====================================================
+# 🔻 BOTTOM DASHBOARD
+# CROSS-CHECK: THICKNESS vs COLOR (PER COIL)
+# =====================================================
 
 st.markdown("---")
-st.header("📏 Cross-Web Thickness (Average per Coil)")
-st.caption("Simple & clear: Average thickness only, grouped by coil")
+st.markdown("## 🎯 Thickness vs Color Deviation (per Coil)")
 
-# ======================================================
-# 1. COLUMN MAPPING (USER SELECT – NO HARD CODE)
-# ======================================================
-st.subheader("🔧 Column Mapping")
+# =========================
+# BASIC COLUMN CHECK
+# =========================
+required_cols = [
+    "Coil No", "塗料編號", "Time",
+    "Avergage Thickness", "ΔE", "ΔL", "Δa", "Δb"
+]
+missing = [c for c in required_cols if c not in df.columns]
 
-coil_col = st.selectbox(
-    "Select COIL column (Cuộn thép)",
-    df.columns,
-    key="coil_col"
-)
-
-time_col = st.selectbox(
-    "Select TIME column",
-    df.columns,
-    key="time_col"
-)
-
-thickness_col = st.selectbox(
-    "Select AVERAGE THICKNESS column",
-    df.columns,
-    key="thickness_col"
-)
-
-# ------------------------------------------------------
-# Prevent duplicate column selection
-# ------------------------------------------------------
-if len({coil_col, time_col, thickness_col}) < 3:
-    st.error("❌ Coil / Time / Thickness must be 3 DIFFERENT columns")
+if missing:
+    st.error(f"❌ Missing required columns: {missing}")
     st.stop()
 
-# ======================================================
-# 2. DATA PREPARATION
-# ======================================================
-df_plot = df[[coil_col, time_col, thickness_col]].copy()
+# =========================
+# TIME PREP
+# =========================
+df_plot = df.copy()
+df_plot["Time"] = pd.to_datetime(df_plot["Time"], errors="coerce")
+df_plot["Year"] = df_plot["Time"].dt.year
+df_plot["Month"] = df_plot["Time"].dt.to_period("M").astype(str)
 
-# Safe datetime conversion
-df_plot[time_col] = pd.to_datetime(
-    df_plot[time_col].astype(str).str.strip(),
-    errors="coerce"
-)
+# =========================
+# FILTERS
+# =========================
+st.markdown("### 🔎 Filters")
 
-# Convert thickness to numeric
-df_plot[thickness_col] = pd.to_numeric(
-    df_plot[thickness_col],
-    errors="coerce"
-)
+col_f1, col_f2, col_f3 = st.columns(3)
 
-df_plot = df_plot.dropna(subset=[coil_col, time_col, thickness_col])
+with col_f1:
+    color_code = st.selectbox(
+        "🎨 Color code",
+        sorted(df_plot["塗料編號"].dropna().unique())
+    )
 
-if df_plot.empty:
-    st.warning("⚠️ No valid data after cleaning")
-    st.stop()
+with col_f2:
+    time_mode = st.radio(
+        "⏱ Time filter mode",
+        ["All", "By Year", "By Month"],
+        horizontal=True
+    )
 
-# ======================================================
-# 3. MONTH FILTER
-# ======================================================
-df_plot["Month"] = df_plot[time_col].dt.to_period("M").astype(str)
+with col_f3:
+    if time_mode == "By Year":
+        year_sel = st.selectbox(
+            "Year",
+            sorted(df_plot["Year"].dropna().unique())
+        )
+    elif time_mode == "By Month":
+        month_sel = st.selectbox(
+            "Month",
+            sorted(df_plot["Month"].dropna().unique())
+        )
 
-month_list = sorted(df_plot["Month"].unique())
+# =========================
+# APPLY FILTER
+# =========================
+df_f = df_plot[df_plot["塗料編號"] == color_code]
 
-selected_month = st.selectbox(
-    "📅 Select month",
-    month_list
-)
+if time_mode == "By Year":
+    df_f = df_f[df_f["Year"] == year_sel]
+elif time_mode == "By Month":
+    df_f = df_f[df_f["Month"] == month_sel]
 
-df_plot = df_plot[df_plot["Month"] == selected_month]
-
-# ======================================================
-# 4. GROUP BY COIL (AVERAGE ONLY)
-# ======================================================
+# =========================
+# GROUP PER COIL
+# =========================
 coil_df = (
-    df_plot
-    .groupby(coil_col, as_index=False)
-    .agg({thickness_col: "mean"})
+    df_f
+    .groupby("Coil No", as_index=False)
+    .agg(
+        Thickness=("Avergage Thickness", "mean"),
+        dE=("ΔE", "mean"),
+        dL=("ΔL", "mean"),
+        da=("Δa", "mean"),
+        db=("Δb", "mean"),
+    )
 )
 
-coil_df = coil_df.sort_values(coil_col)
+if coil_df.empty:
+    st.warning("⚠️ No data after filtering")
+    st.stop()
 
-# ======================================================
-# 5. BAR CHART – EASY TO UNDERSTAND
-# ======================================================
-st.subheader("📊 Average Thickness by Coil")
+# =========================
+# SCATTER: THICKNESS vs ΔE
+# =========================
+st.markdown("### 📌 Thickness vs ΔE (per Coil)")
 
-fig, ax = plt.subplots(figsize=(14, 4))
+fig, ax = plt.subplots(figsize=(8, 5))
 
-ax.bar(
-    coil_df[coil_col].astype(str),
-    coil_df[thickness_col]
+ax.scatter(
+    coil_df["Thickness"],
+    coil_df["dE"],
+    s=80,
+    alpha=0.8
 )
 
-mean_val = coil_df[thickness_col].mean()
-
-ax.axhline(
-    mean_val,
+# Mean lines
+ax.axvline(
+    coil_df["Thickness"].mean(),
     linestyle="--",
-    linewidth=2,
-    label=f"Mean = {mean_val:.2f}"
+    color="gray",
+    label="Mean Thickness"
+)
+ax.axhline(
+    coil_df["dE"].mean(),
+    linestyle="--",
+    color="orange",
+    label="Mean ΔE"
 )
 
-ax.set_xlabel("Coil")
-ax.set_ylabel("Average Thickness (µm)")
-ax.set_title("Average Coating Thickness per Coil")
+ax.set_xlabel("Average Thickness")
+ax.set_ylabel("ΔE")
+ax.set_title(f"Thickness vs ΔE — Color {color_code}")
+ax.grid(alpha=0.3)
 ax.legend()
 
-plt.xticks(rotation=90)
 st.pyplot(fig)
 
-# ======================================================
-# 6. DISTRIBUTION (VERY SIMPLE)
-# ======================================================
-st.subheader("📈 Thickness Distribution (per Coil)")
+# =========================
+# ΔL / Δa / Δb vs Thickness
+# =========================
+st.markdown("### 🎨 Color Components vs Thickness")
 
-fig2, ax2 = plt.subplots(figsize=(6, 4))
+cols = st.columns(3)
+color_map = {
+    "dL": ("ΔL", "#1f77b4"),
+    "da": ("Δa", "#2ca02c"),
+    "db": ("Δb", "#d62728"),
+}
 
-ax2.hist(coil_df[thickness_col], bins=10)
-ax2.set_xlabel("Average Thickness (µm)")
-ax2.set_ylabel("Number of Coils")
-ax2.set_title("Distribution of Average Thickness")
+for col_ui, key in zip(cols, color_map):
+    with col_ui:
+        label, c = color_map[key]
+        fig, ax = plt.subplots(figsize=(4, 4))
+        ax.scatter(
+            coil_df["Thickness"],
+            coil_df[key],
+            color=c,
+            s=70,
+            alpha=0.8
+        )
+        ax.set_xlabel("Thickness")
+        ax.set_ylabel(label)
+        ax.set_title(f"{label} vs Thickness")
+        ax.grid(alpha=0.3)
+        st.pyplot(fig)
 
-st.pyplot(fig2)
+# =========================
+# DISTRIBUTION
+# =========================
+st.markdown("### 📊 Distribution Overview")
 
+col_d1, col_d2 = st.columns(2)
+
+with col_d1:
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.hist(coil_df["Thickness"], bins=10, alpha=0.8)
+    ax.set_title("Thickness Distribution")
+    ax.set_xlabel("Thickness")
+    ax.set_ylabel("Count")
+    ax.grid(axis="y", alpha=0.3)
+    st.pyplot(fig)
+
+with col_d2:
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.hist(coil_df["dE"], bins=10, color="orange", alpha=0.8)
+    ax.set_title("ΔE Distribution")
+    ax.set_xlabel("ΔE")
+    ax.set_ylabel("Count")
+    ax.grid(axis="y", alpha=0.3)
+    st.pyplot(fig)
+
+# =========================
+# SUMMARY TABLE
+# =========================
+st.markdown("### 📋 Summary (per Coil)")
+
+summary_df = coil_df.round(3)
+st.dataframe(summary_df, use_container_width=True)
 
 
 
