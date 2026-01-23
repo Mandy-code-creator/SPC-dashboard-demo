@@ -553,9 +553,9 @@ pdf_images = []
 # =========================
 # DASHBOARD
 # =========================
-pdf_figs = []
 
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
+pdf_figs = []
 for k in spc:
     fig = spc_combined(
         spc[k]["lab"],
@@ -565,9 +565,10 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
+pdf_figs.append(fig)
 
     img_path = save_fig_to_png(fig, f"COMBINED_{color}_{k}")
-    pdf_images.append((k, img_path))
+    pdf_figs.append((k, img_path))
 # =========================
 # EXPORT PDF (AUDIT / REPORT)
 # =========================
@@ -946,6 +947,7 @@ st.download_button(
     file_name="SPC_Distribution_Report.pdf",
     mime="application/pdf"
 )
+
 
 
 
