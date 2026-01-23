@@ -757,6 +757,7 @@ else:
 
 # ======================================================
 # ======================================================
+# ======================================================
 # 📏 CROSS-WEB THICKNESS SPC & COLOR RELATION (LINE ONLY)
 # ======================================================
 
@@ -775,8 +776,8 @@ source_df = df.copy()
 required_cols = [
     "製造批號",
     "Avergage Thickness (µm)正面",
-    "Coating Thickness 正面 - 北",
-    "Coating Thickness 正面 - 南",
+    "Coating Thickness 正面 -北",
+    "Coating Thickness 正面 -南",
     "正-北 ΔL", "正-南 ΔL",
     "正-北 Δa", "正-南 Δa",
     "正-北 Δb", "正-南 Δb",
@@ -792,15 +793,15 @@ if missing_cols:
 # =========================
 cd_df = source_df.dropna(subset=required_cols).copy()
 
-# Thickness
+# Thickness metrics
 cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
 cd_df["CD Thickness Diff"] = (
-    cd_df["Coating Thickness 正面 - 北"]
-    - cd_df["Coating Thickness 正面 - 南"]
+    cd_df["Coating Thickness 正面 -北"]
+    - cd_df["Coating Thickness 正面 -南"]
 )
 cd_df["CD Uniformity"] = cd_df["CD Thickness Diff"].abs()
 
-# LINE color (North & South average)
+# LINE color deviation (average North / South)
 cd_df["ΔL_LINE"] = cd_df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
 cd_df["Δa_LINE"] = cd_df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
 cd_df["Δb_LINE"] = cd_df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
@@ -938,6 +939,7 @@ with cols[2]:
         "Δb",
         "Thickness Diff vs Δb"
     )
+
 
 
 
