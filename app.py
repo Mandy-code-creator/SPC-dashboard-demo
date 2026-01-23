@@ -757,24 +757,40 @@ else:
 
 # ======================================================
 # ======================================================
-# ======================================================
-# 📏 CROSS-WEB THICKNESS SPC & COLOR RELATION (LINE ONLY)
-# ======================================================
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
 
-st.markdown("---")
-st.markdown("## 📏 Cross-Web Thickness SPC & Color Relation (LINE)")
-st.caption(
-    "Monitor coating thickness variation and its impact on color deviation "
-    "(Target thickness = 25 µm, including primer layer)"
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="Cross-Web Thickness SPC",
+    page_icon="📏",
+    layout="wide"
 )
 
-# =========================
-# SOURCE DATA
-# =========================
-source_df = df.copy()
+st.title("📏 Cross-Web Thickness SPC & Color Relation (LINE)")
 
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
+def load_data():
+    url = "PUT_YOUR_GOOGLE_SHEET_CSV_URL_HERE"
+    return pd.read_csv(url)
+
+df = load_data()
+
+# =========================
+# REQUIRED COLUMNS
+# =========================
 required_cols = [
-    "製造批號",
+    "日期",
+    "LINE",
+    "顏色代碼",
+    "鋼捲號",
     "Avergage Thickness (µm)正面",
     "Coating Thickness 正面 -北",
     "Coating Thickness 正面 -南",
@@ -783,127 +799,144 @@ required_cols = [
     "正-北 Δb", "正-南 Δb",
 ]
 
-missing_cols = [c for c in required_cols if c not in source_df.columns]
-if missing_cols:
-    st.error(f"❌ Missing required columns: {missing_cols}")
+missing = [c for c in required_cols if c not in df.columns]
+if missing:
+    st.error(f"❌ Missing required columns: {missing}")
     st.stop()
 
 # =========================
-# DATA PREPARATION
+# DATA PREP
 # =========================
-cd_df = source_df.dropna(subset=required_cols).copy()
+df["日期"] = pd.to_datetime(df["日期"])
 
-# Thickness metrics
-cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
-cd_df["CD Thickness Diff"] = (
-    cd_df["Coating Thickness 正面 -北"]
-    - cd_df["Coating Thickness 正面 -南"]
+df["CD Avg Thickness"] = df["Avergage Thickness (µm)正面"]
+df["CD Thickness Diff"] = (
+    df["Coating Thickness 正面 -北"]
+    - df["Coating Thickness 正面 -南"]
 )
-cd_df["CD Uniformity"] = cd_df["CD Thickness Diff"].abs()
 
-# LINE color deviation (average North / South)
-cd_df["ΔL_LINE"] = cd_df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
-cd_df["Δa_LINE"] = cd_df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
-cd_df["Δb_LINE"] = cd_df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+df["ΔL_LINE"] = df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+df["Δa_LINE"] = df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+df["Δb_LINE"] = df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
 # =========================
-# SPC PLOT FUNCTION
+# SIDEBAR FILTERS
 # =========================
-def plot_spc(df, value_col, title, target=None, ylabel="µm"):
-    mean = df[value_col].mean()
-    std = df[value_col].std()
+st.sidebar.header("🔎 Filter")
+
+# LINE
+lines = sorted(df["LINE"].dropna().unique())
+selected_line = st.sidebar.selectbox("Select LINE", lines)
+
+# PAINT CODE
+paint_codes = sorted(
+    df[df["LINE"] == selected_line]["顏色代碼"].dropna().unique()
+)
+selected_paint = st.sidebar.selectbox("Select Paint Code", paint_codes)
+
+# DATE RANGE
+min_date = df["日期"].min()
+max_date = df["日期"].max()
+
+date_range = st.sidebar.date_input(
+    "Select Date Range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+if len(date_range) != 2:
+    st.stop()
+
+start_date, end_date = date_range
+
+# =========================
+# FILTERED DATA
+# =========================
+f_df = df[
+    (df["LINE"] == selected_line) &
+    (df["顏色代碼"] == selected_paint) &
+    (df["日期"] >= pd.to_datetime(start_date)) &
+    (df["日期"] <= pd.to_datetime(end_date))
+].copy()
+
+if f_df.empty:
+    st.warning("⚠️ No data after filtering")
+    st.stop()
+
+# =========================
+# COIL LEVEL AGGREGATION
+# =========================
+coil_df = (
+    f_df
+    .groupby("鋼捲號", as_index=False)
+    .agg({
+        "CD Avg Thickness": "mean",
+        "CD Thickness Diff": "mean",
+        "ΔL_LINE": "mean",
+        "Δa_LINE": "mean",
+        "Δb_LINE": "mean",
+    })
+)
+
+# =========================
+# SPC FUNCTION
+# =========================
+def spc_plot(series, title, target=None, ylabel="µm"):
+    mean = series.mean()
+    std = series.std()
 
     fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(series.values, marker="o")
 
-    ax.plot(
-        df["製造批號"],
-        df[value_col],
-        "o-",
-        linewidth=2
-    )
-
-    # Mean
     ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
 
-    # Target
     if target is not None:
-        ax.axhline(
-            target,
-            linestyle="--",
-            linewidth=2,
-            label=f"Target = {target}"
-        )
+        ax.axhline(target, linestyle="--", linewidth=2, label=f"Target {target}")
 
-    # 3 Sigma
-    if std > 0 and not np.isnan(std):
-        ucl = mean + 3 * std
-        lcl = mean - 3 * std
-
-        ax.axhline(ucl, linestyle="--", label="+3σ")
-        ax.axhline(lcl, linestyle="--", label="-3σ")
-
-        ooc = (df[value_col] > ucl) | (df[value_col] < lcl)
-        ax.scatter(
-            df.loc[ooc, "製造批號"],
-            df.loc[ooc, value_col],
-            s=90,
-            zorder=5,
-            label="OOC"
-        )
+    if std > 0:
+        ax.axhline(mean + 3*std, linestyle="--", label="+3σ")
+        ax.axhline(mean - 3*std, linestyle="--", label="-3σ")
 
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    fig.subplots_adjust(right=0.78)
-
+    ax.legend()
     st.pyplot(fig)
 
 # =========================
-# 1️⃣ THICKNESS SPC
+# SPC SECTION
 # =========================
-plot_spc(
-    cd_df,
-    "CD Avg Thickness",
-    "CD Average Thickness (Target = 25 µm)",
+st.markdown("## 📊 Thickness SPC (LINE)")
+
+spc_plot(
+    coil_df["CD Avg Thickness"],
+    "CD Average Thickness per Coil (Target = 25 µm)",
     target=25
 )
 
-plot_spc(
-    cd_df,
-    "CD Thickness Diff",
+spc_plot(
+    coil_df["CD Thickness Diff"],
     "CD Thickness Difference (North - South)",
     target=0
 )
 
-plot_spc(
-    cd_df,
-    "CD Uniformity",
-    "CD Thickness Uniformity |North - South|"
-)
-
 # =========================
-# 2️⃣ THICKNESS ↔ COLOR RELATION
+# RELATION FUNCTION
 # =========================
-st.markdown("### 🎨 Thickness vs Color Deviation (LINE)")
-
-def scatter_relation(x, y, xlabel, ylabel, title):
+def scatter_plot(x, y, xlabel, ylabel, title):
     fig, ax = plt.subplots(figsize=(5, 4))
-
-    ax.scatter(x, y, alpha=0.75)
+    ax.scatter(x, y, alpha=0.7)
     ax.grid(alpha=0.3)
-
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
 
-    # Correlation
     if len(x) > 2:
-        corr = np.corrcoef(x, y)[0, 1]
+        r = np.corrcoef(x, y)[0, 1]
         ax.text(
             0.05, 0.95,
-            f"r = {corr:.2f}",
+            f"r = {r:.2f}",
             transform=ax.transAxes,
             va="top",
             bbox=dict(facecolor="white", alpha=0.8)
@@ -911,35 +944,48 @@ def scatter_relation(x, y, xlabel, ylabel, title):
 
     st.pyplot(fig)
 
+# =========================
+# THICKNESS ↔ COLOR
+# =========================
+st.markdown("## 🎨 Thickness ↔ Color Relation (Steel Coil Level)")
+
 cols = st.columns(3)
 
 with cols[0]:
-    scatter_relation(
-        cd_df["CD Avg Thickness"],
-        cd_df["ΔL_LINE"],
+    scatter_plot(
+        coil_df["CD Avg Thickness"],
+        coil_df["ΔL_LINE"],
         "Avg Thickness (µm)",
         "ΔL",
         "Thickness vs ΔL"
     )
 
 with cols[1]:
-    scatter_relation(
-        cd_df["CD Thickness Diff"],
-        cd_df["Δa_LINE"],
+    scatter_plot(
+        coil_df["CD Thickness Diff"],
+        coil_df["Δa_LINE"],
         "Thickness Diff (N - S)",
         "Δa",
-        "Thickness Diff vs Δa"
+        "CD Thickness vs Δa"
     )
 
 with cols[2]:
-    scatter_relation(
-        cd_df["CD Thickness Diff"],
-        cd_df["Δb_LINE"],
+    scatter_plot(
+        coil_df["CD Thickness Diff"],
+        coil_df["Δb_LINE"],
         "Thickness Diff (N - S)",
         "Δb",
-        "Thickness Diff vs Δb"
+        "CD Thickness vs Δb"
     )
 
+# =========================
+# SUMMARY
+# =========================
+st.markdown("## 📋 Summary (Filtered Data)")
+
+st.dataframe(
+    coil_df.describe().round(2)
+)
 
 
 
