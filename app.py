@@ -872,6 +872,38 @@ ax2.grid(True, linestyle="--", alpha=0.4)
 st.pyplot(fig2)
 
 # =========================
+# THICKNESS DISTRIBUTION
+# =========================
+st.subheader("📊 Average Thickness Distribution (Per Coil)")
+
+# đảm bảo cột độ dày tồn tại
+if thickness_col not in df_plot.columns:
+    st.error(f"❌ Thickness column not found: {thickness_col}")
+else:
+    fig_t, ax_t = plt.subplots(figsize=(10, 4))
+
+    ax_t.hist(
+        df_plot[thickness_col].dropna(),
+        bins=20
+    )
+
+    mean_thk = df_plot[thickness_col].mean()
+    ax_t.axvline(
+        mean_thk,
+        linestyle="--",
+        linewidth=2,
+        label=f"Mean = {mean_thk:.2f}"
+    )
+
+    ax_t.set_xlabel("Average Thickness")
+    ax_t.set_ylabel("Number of Coils")
+    ax_t.set_title("Thickness Distribution (Each Coil = 1 Value)")
+    ax_t.legend()
+    ax_t.grid(True, linestyle="--", alpha=0.4)
+
+    st.pyplot(fig_t)
+
+# =========================
 # DATA TABLE
 # =========================
 st.subheader("📋 Coil Summary")
@@ -887,6 +919,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
