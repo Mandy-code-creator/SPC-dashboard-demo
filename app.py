@@ -14,6 +14,21 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
 
+from reportlab.platypus import SimpleDocTemplate, Image
+from reportlab.lib.pagesizes import A4
+import io
+
+def export_pdf(image_paths):
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4)
+
+    story = []
+    for p in image_paths:
+        story.append(Image(p, width=400, height=280))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
 
 # =========================
 # PAGE CONFIG
@@ -486,6 +501,16 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
+    st.pyplot(fig)
+
+# === SAVE FIG FOR PDF ===
+import os
+os.makedirs("charts", exist_ok=True)
+
+img_path = f"charts/{k}_line.png"
+fig.savefig(img_path, dpi=150, bbox_inches="tight")
+plt.close(fig)
+
     download(fig, f"COMBINED_{color}_{k}.png")
 
 
@@ -821,6 +846,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
