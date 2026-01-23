@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import stats
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
@@ -23,23 +22,21 @@ st.title("📈 SPC Color Dashboard")
 st.caption("Xbar–R | Cp / Cpk | Normal Distribution")
 
 # =========================
-# DATA UPLOAD (FIX ERROR)
+# UPLOAD DATA
 # =========================
-st.subheader("📂 Upload Data")
-
 uploaded_file = st.file_uploader(
-    "Upload CSV file",
+    "📂 Upload CSV file",
     type=["csv"]
 )
 
 if uploaded_file is None:
-    st.warning("⬆️ Please upload a CSV file to continue")
+    st.warning("⬆️ Please upload CSV to continue")
     st.stop()
 
 df = pd.read_csv(uploaded_file)
 
 # =========================
-# REQUIRED COLUMNS CHECK
+# CHECK COLUMNS
 # =========================
 required_cols = [
     "Time", "Batch",
@@ -48,7 +45,6 @@ required_cols = [
 ]
 
 missing = [c for c in required_cols if c not in df.columns]
-
 if missing:
     st.error(f"❌ Missing columns: {missing}")
     st.stop()
@@ -108,7 +104,7 @@ with col2:
     )
 
 # =========================
-# XBAR-R CHART (TEXTBOOK)
+# XBAR–R CHART (TEXTBOOK)
 # =========================
 st.subheader("📈 SPC Xbar–R Chart")
 
@@ -144,6 +140,7 @@ ax1.axhline(xbar_bar, linestyle="--", label="Mean")
 ax1.axhline(UCLx, color="red", linestyle="--")
 ax1.axhline(LCLx, color="red", linestyle="--")
 ax1.set_title("X̄ Chart")
+ax1.legend()
 ax1.grid(True)
 
 ax2.plot(r.index, r, marker="o")
@@ -151,6 +148,7 @@ ax2.axhline(r_bar, linestyle="--", label="R̄")
 ax2.axhline(UCLr, color="red", linestyle="--")
 ax2.axhline(LCLr, color="red", linestyle="--")
 ax2.set_title("R Chart")
+ax2.legend()
 ax2.grid(True)
 
 st.pyplot(fig)
@@ -158,7 +156,7 @@ st.pyplot(fig)
 # =========================
 # CP / CPK + NORMAL CURVE
 # =========================
-st.subheader("🎯 Cp / Cpk & Normal Distribution")
+st.subheader("🎯 Cp / Cpk & Normal Curve")
 
 USL = st.number_input("USL", value=float(df[metric].max()))
 LSL = st.number_input("LSL", value=float(df[metric].min()))
@@ -172,17 +170,20 @@ Cpk = min(
     (mu - LSL) / (3 * sigma)
 )
 
-st.metric("Cp", round(Cp, 2))
-st.metric("Cpk", round(Cpk, 2))
+colA, colB = st.columns(2)
+colA.metric("Cp", f"{Cp:.2f}")
+colB.metric("Cpk", f"{Cpk:.2f}")
 
-x = np.linspace(mu - 4*sigma, mu + 4*sigma, 200)
-y = stats.norm.pdf(x, mu, sigma)
+# Normal PDF (NO SCIPY)
+x = np.linspace(mu - 4*sigma, mu + 4*sigma, 300)
+pdf = (1 / (sigma * np.sqrt(2*np.pi))) * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
 fig2, ax = plt.subplots(figsize=(10, 4))
-ax.plot(x, y)
+ax.plot(x, pdf)
 ax.axvline(USL, color="red", linestyle="--", label="USL")
 ax.axvline(LSL, color="red", linestyle="--", label="LSL")
 ax.axvline(mu, linestyle="--", label="Mean")
+ax.set_title("Normal Distribution")
 ax.legend()
 ax.grid(True)
 
