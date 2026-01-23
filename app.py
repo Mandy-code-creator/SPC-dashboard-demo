@@ -482,13 +482,12 @@ def normal_pdf(x, mean, std):
 # =========================
 # LINE PROCESS DISTRIBUTION
 # =========================
-
 import altair as alt
 import pandas as pd
 import numpy as np
 import streamlit as st
 
-# ---- Capability (NO PPK)
+# ---- Capability calculation (NO PPK)
 def calc_capability(values, lcl, ucl):
     if lcl is None or ucl is None:
         return None, None, None
@@ -527,7 +526,7 @@ for i, k in enumerate(spc):
 
         df = pd.DataFrame({"value": values})
 
-        # ===== Histogram (Altair v5+ SAFE)
+        # ===== Histogram
         hist = alt.Chart(df).mark_bar().encode(
             x=alt.X(
                 "value:Q",
@@ -536,7 +535,7 @@ for i, k in enumerate(spc):
             ),
             y=alt.Y("count()", title="Count"),
             color=alt.condition(
-                alt.datum.value < lcl or alt.datum.value > ucl
+                (alt.datum.value < lcl) | (alt.datum.value > ucl)
                 if lcl is not None and ucl is not None else alt.value(False),
                 alt.value("red"),
                 alt.value("#4dabf7")
@@ -550,9 +549,11 @@ for i, k in enumerate(spc):
             height=240
         )
 
-        # ===== Normal curve
+        # ===== Normal curve (±3σ – kéo dài đuôi)
+        normal = alt.Chart(pd.DataFrame())
+
         if std > 0:
-            x = np.linspace(values.min(), values.max(), 200)
+            x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
             y = (
                 (1 / (std * np.sqrt(2 * np.pi))) *
                 np.exp(-0.5 * ((x - mean) / std) ** 2)
@@ -561,7 +562,8 @@ for i, k in enumerate(spc):
             normal_df = pd.DataFrame({"x": x, "y": y})
 
             normal = alt.Chart(normal_df).mark_line(
-                color="black"
+                color="black",
+                strokeWidth=2
             ).encode(
                 x="x:Q",
                 y=alt.Y("y:Q", title="Density"),
@@ -570,12 +572,50 @@ for i, k in enumerate(spc):
                     alt.Tooltip("y:Q", title="Density", format=".4f")
                 ]
             )
-        else:
-            normal = alt.Chart(pd.DataFrame())
 
-        st.altair_chart(hist + normal, use_container_width=True)
+        # ===== USL / LSL vertical lines
+        rules = []
 
-        # ===== Capability box
+        if lcl is not None:
+            lsl_df = pd.DataFrame({"x": [lcl], "label": ["LSL"]})
+            rules.append(
+                alt.Chart(lsl_df).mark_rule(
+                    color="red",
+                    strokeDash=[6, 4],
+                    strokeWidth=2
+                ).encode(
+                    x="x:Q",
+                    tooltip=[
+                        alt.Tooltip("label:N"),
+                        alt.Tooltip("x:Q", title="LSL", format=".3f")
+                    ]
+                )
+            )
+
+        if ucl is not None:
+            usl_df = pd.DataFrame({"x": [ucl], "label": ["USL"]})
+            rules.append(
+                alt.Chart(usl_df).mark_rule(
+                    color="red",
+                    strokeDash=[6, 4],
+                    strokeWidth=2
+                ).encode(
+                    x="x:Q",
+                    tooltip=[
+                        alt.Tooltip("label:N"),
+                        alt.Tooltip("x:Q", title="USL", format=".3f")
+                    ]
+                )
+            )
+
+        # ===== Combine chart
+        chart = hist + normal
+        for r in rules:
+            chart += r
+
+        st.altair_chart(chart, use_container_width=True)
+
+        # ===== Capability display
         if cp is not None:
             st.markdown(
                 f"""
@@ -687,6 +727,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
