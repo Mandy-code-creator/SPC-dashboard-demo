@@ -757,46 +757,25 @@ else:
 
 # ======================================================
 # ======================================================
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
+
+# =========================================================
+# 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
+# =========================================================
+
+st.markdown("---")
+st.markdown("## 🧱 Cross-Web Thickness SPC (LINE)")
 
 # =========================
-# PAGE CONFIG
-# =========================
-st.set_page_config(
-    page_title="Cross-Web Thickness SPC",
-    page_icon="📏",
-    layout="wide"
-)
-
-st.title("📏 Cross-Web Thickness SPC & Color Relation (LINE)")
-
-# =========================
-# LOAD DATA
-# =========================
-@st.cache_data
-def load_data():
-    url = "PUT_YOUR_GOOGLE_SHEET_CSV_URL_HERE"
-    return pd.read_csv(url)
-
-df = load_data()
-
-# =========================
-# REQUIRED COLUMNS
+# BASIC COLUMN CHECK
 # =========================
 required_cols = [
-    "日期",
-    "LINE",
-    "顏色代碼",
-    "鋼捲號",
-    "Avergage Thickness (µm)正面",
-    "Coating Thickness 正面 -北",
-    "Coating Thickness 正面 -南",
-    "正-北 ΔL", "正-南 ΔL",
-    "正-北 Δa", "正-南 Δa",
-    "正-北 Δb", "正-南 Δb",
+    "Time",
+    "製造批號",
+    "塗料編號",
+    "Coating Thickness 正面",
+    "Coating Thickness 正面 - 北",
+    "Coating Thickness 正面 - 南",
+    "Avergage Thickness (µm)正面"
 ]
 
 missing = [c for c in required_cols if c not in df.columns]
@@ -805,187 +784,179 @@ if missing:
     st.stop()
 
 # =========================
-# DATA PREP
+# PREP DATA
 # =========================
-df["日期"] = pd.to_datetime(df["日期"])
+thk_df = df.copy()
+thk_df["Time"] = pd.to_datetime(thk_df["Time"])
 
-df["CD Avg Thickness"] = df["Avergage Thickness (µm)正面"]
-df["CD Thickness Diff"] = (
-    df["Coating Thickness 正面 -北"]
-    - df["Coating Thickness 正面 -南"]
+# =========================
+# SIDEBAR FILTER
+# =========================
+st.sidebar.divider()
+st.sidebar.header("🧱 Thickness Filter")
+
+thk_color = st.sidebar.selectbox(
+    "Paint code (Thickness)",
+    sorted(thk_df["塗料編號"].dropna().unique())
 )
-
-df["ΔL_LINE"] = df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
-df["Δa_LINE"] = df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
-df["Δb_LINE"] = df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
-
-# =========================
-# SIDEBAR FILTERS
-# =========================
-st.sidebar.header("🔎 Filter")
-
-# LINE
-lines = sorted(df["LINE"].dropna().unique())
-selected_line = st.sidebar.selectbox("Select LINE", lines)
-
-# PAINT CODE
-paint_codes = sorted(
-    df[df["LINE"] == selected_line]["顏色代碼"].dropna().unique()
-)
-selected_paint = st.sidebar.selectbox("Select Paint Code", paint_codes)
-
-# DATE RANGE
-min_date = df["日期"].min()
-max_date = df["日期"].max()
 
 date_range = st.sidebar.date_input(
-    "Select Date Range",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date
+    "Time range",
+    [
+        thk_df["Time"].min().date(),
+        thk_df["Time"].max().date()
+    ]
 )
 
-if len(date_range) != 2:
-    st.stop()
-
-start_date, end_date = date_range
-
 # =========================
-# FILTERED DATA
+# APPLY FILTER
 # =========================
-f_df = df[
-    (df["LINE"] == selected_line) &
-    (df["顏色代碼"] == selected_paint) &
-    (df["日期"] >= pd.to_datetime(start_date)) &
-    (df["日期"] <= pd.to_datetime(end_date))
-].copy()
+thk_df = thk_df[thk_df["塗料編號"] == thk_color]
 
-if f_df.empty:
-    st.warning("⚠️ No data after filtering")
+if len(date_range) == 2:
+    start, end = date_range
+    thk_df = thk_df[
+        (thk_df["Time"].dt.date >= start) &
+        (thk_df["Time"].dt.date <= end)
+    ]
+
+if thk_df.empty:
+    st.warning("No thickness data after filtering")
     st.stop()
 
 # =========================
-# COIL LEVEL AGGREGATION
+# AGGREGATE BY COIL
 # =========================
 coil_df = (
-    f_df
-    .groupby("鋼捲號", as_index=False)
-    .agg({
-        "CD Avg Thickness": "mean",
-        "CD Thickness Diff": "mean",
-        "ΔL_LINE": "mean",
-        "Δa_LINE": "mean",
-        "Δb_LINE": "mean",
-    })
+    thk_df
+    .groupby("製造批號", as_index=False)
+    .agg(
+        Time=("Time", "min"),
+        Target=("Coating Thickness 正面", "mean"),
+        Avg=("Avergage Thickness (µm)正面", "mean"),
+        North=("Coating Thickness 正面 - 北", "mean"),
+        South=("Coating Thickness 正面 - 南", "mean")
+    )
 )
 
-# =========================
-# SPC FUNCTION
-# =========================
-def spc_plot(series, title, target=None, ylabel="µm"):
-    mean = series.mean()
-    std = series.std()
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(series.values, marker="o")
-
-    ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
-
-    if target is not None:
-        ax.axhline(target, linestyle="--", linewidth=2, label=f"Target {target}")
-
-    if std > 0:
-        ax.axhline(mean + 3*std, linestyle="--", label="+3σ")
-        ax.axhline(mean - 3*std, linestyle="--", label="-3σ")
-
-    ax.set_title(title)
-    ax.set_ylabel(ylabel)
-    ax.grid(True)
-    ax.legend()
-    st.pyplot(fig)
+coil_df["CD_Diff"] = coil_df["North"] - coil_df["South"]
+coil_df["CD_Abs"] = coil_df["CD_Diff"].abs()
 
 # =========================
-# SPC SECTION
+# SUMMARY METRICS
 # =========================
-st.markdown("## 📊 Thickness SPC (LINE)")
+target = coil_df["Target"].mean()
+mean_avg = coil_df["Avg"].mean()
+std_avg = coil_df["Avg"].std()
 
-spc_plot(
-    coil_df["CD Avg Thickness"],
-    "CD Average Thickness per Coil (Target = 25 µm)",
-    target=25
+ucl = mean_avg + 3 * std_avg
+lcl = mean_avg - 3 * std_avg
+
+# =========================
+# KPI
+# =========================
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric("Target (µm)", f"{target:.2f}")
+c2.metric("Mean Avg (µm)", f"{mean_avg:.2f}")
+c3.metric("Std Dev (µm)", f"{std_avg:.3f}")
+c4.metric("Mean |CD diff| (µm)", f"{coil_df['CD_Abs'].mean():.3f}")
+
+# =========================
+# SPC CHART – AVERAGE
+# =========================
+fig, ax = plt.subplots(figsize=(12, 4))
+
+ax.plot(
+    coil_df["製造批號"],
+    coil_df["Avg"],
+    marker="o",
+    linewidth=2,
+    label="Average Thickness"
 )
 
-spc_plot(
-    coil_df["CD Thickness Diff"],
-    "CD Thickness Difference (North - South)",
-    target=0
+ax.axhline(target, linestyle="--", color="green", label="Target = 25 µm")
+ax.axhline(mean_avg, linestyle=":", color="blue", label="Mean")
+ax.axhline(ucl, linestyle="--", color="red", label="+3σ")
+ax.axhline(lcl, linestyle="--", color="red", label="-3σ")
+
+ooc = (coil_df["Avg"] > ucl) | (coil_df["Avg"] < lcl)
+ax.scatter(
+    coil_df.loc[ooc, "製造批號"],
+    coil_df.loc[ooc, "Avg"],
+    color="red",
+    s=80,
+    zorder=5,
+    label="OOC"
 )
 
-# =========================
-# RELATION FUNCTION
-# =========================
-def scatter_plot(x, y, xlabel, ylabel, title):
-    fig, ax = plt.subplots(figsize=(5, 4))
-    ax.scatter(x, y, alpha=0.7)
-    ax.grid(alpha=0.3)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
+ax.set_title(f"CD Average Thickness SPC — Paint {thk_color}")
+ax.set_ylabel("Thickness (µm)")
+ax.tick_params(axis="x", rotation=45)
+ax.grid(True)
+ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
 
-    if len(x) > 2:
-        r = np.corrcoef(x, y)[0, 1]
-        ax.text(
-            0.05, 0.95,
-            f"r = {r:.2f}",
-            transform=ax.transAxes,
-            va="top",
-            bbox=dict(facecolor="white", alpha=0.8)
+fig.subplots_adjust(right=0.78)
+st.pyplot(fig)
+
+# =========================
+# CD PROFILE – NORTH vs SOUTH
+# =========================
+st.markdown("### 📏 Cross-Web Imbalance (North vs South)")
+
+fig2, ax2 = plt.subplots(figsize=(12, 4))
+
+ax2.plot(
+    coil_df["製造批號"],
+    coil_df["CD_Diff"],
+    marker="o",
+    linewidth=2
+)
+
+ax2.axhline(0, color="black", linewidth=1)
+ax2.axhline(1, linestyle="--", color="orange", label="+1 µm")
+ax2.axhline(-1, linestyle="--", color="orange", label="-1 µm")
+
+ax2.set_title("CD Thickness Difference (North − South)")
+ax2.set_ylabel("Δ Thickness (µm)")
+ax2.tick_params(axis="x", rotation=45)
+ax2.grid(True)
+ax2.legend()
+
+st.pyplot(fig2)
+
+# =========================
+# THICKNESS ↔ COLOR RELATION
+# =========================
+st.markdown("### 🎨 Thickness vs Color Deviation")
+
+for k in ["ΔL", "Δa", "Δb"]:
+    if f"正-北 {k}" in df.columns and f"正-南 {k}" in df.columns:
+        coil_df[k] = (
+            df.groupby("製造批號")[[f"正-北 {k}", f"正-南 {k}"]]
+            .mean()
+            .mean(axis=1)
+            .values
         )
 
-    st.pyplot(fig)
+        fig3, ax3 = plt.subplots(figsize=(5, 4))
+        ax3.scatter(coil_df["Avg"], coil_df[k])
+        ax3.set_xlabel("Average Thickness (µm)")
+        ax3.set_ylabel(k)
+        ax3.set_title(f"{k} vs Thickness")
+        ax3.grid(True)
+
+        st.pyplot(fig3)
 
 # =========================
-# THICKNESS ↔ COLOR
+# DATA TABLE
 # =========================
-st.markdown("## 🎨 Thickness ↔ Color Relation (Steel Coil Level)")
-
-cols = st.columns(3)
-
-with cols[0]:
-    scatter_plot(
-        coil_df["CD Avg Thickness"],
-        coil_df["ΔL_LINE"],
-        "Avg Thickness (µm)",
-        "ΔL",
-        "Thickness vs ΔL"
+with st.expander("📋 Coil Thickness Detail"):
+    st.dataframe(
+        coil_df.round(3),
+        use_container_width=True,
+        hide_index=True
     )
-
-with cols[1]:
-    scatter_plot(
-        coil_df["CD Thickness Diff"],
-        coil_df["Δa_LINE"],
-        "Thickness Diff (N - S)",
-        "Δa",
-        "CD Thickness vs Δa"
-    )
-
-with cols[2]:
-    scatter_plot(
-        coil_df["CD Thickness Diff"],
-        coil_df["Δb_LINE"],
-        "Thickness Diff (N - S)",
-        "Δb",
-        "CD Thickness vs Δb"
-    )
-
-# =========================
-# SUMMARY
-# =========================
-st.markdown("## 📋 Summary (Filtered Data)")
-
-st.dataframe(
-    coil_df.describe().round(2)
-)
 
 
 
