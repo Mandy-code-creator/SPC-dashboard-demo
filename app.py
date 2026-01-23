@@ -113,3 +113,150 @@ if "Time" in df.columns:
 
 st.success("✅ Google Sheets loaded successfully")
 st.write(df.head())
+# =========================
+# COLOR CODE FILTER
+# =========================
+st.sidebar.header("🎨 Bộ lọc mã màu")
+
+color_list = sorted(df["色號"].dropna().unique())
+selected_colors = st.sidebar.multiselect(
+    "Chọn mã màu",
+    color_list,
+    default=color_list
+)
+
+filtered_df = df[df["色號"].isin(selected_colors)]
+def calc_per_coil(df):
+    tmp = df[[
+        "製造批號",
+        "色號",
+        "正-北 ΔL", "正-南 ΔL",
+        "正-北 Δa", "正-南 Δa",
+        "正-北 Δb", "正-南 Δb"
+    ]].copy()
+
+    tmp = tmp.dropna()
+
+    tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+    tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+    tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+
+    return tmp[["製造批號", "色號", "L", "a", "b"]]
+
+coil_df = calc_per_coil(filtered_df)
+batch_mean_df = (
+    coil_df
+    .groupby(["色號", "製造批號"])
+    .agg(
+        coil_count=("L", "count"),
+        L_mean=("L", "mean"),
+        a_mean=("a", "mean"),
+        b_mean=("b", "mean"),
+    )
+    .round(2)
+    .reset_index()
+)
+st.subheader("📊 Batch LAB Mean (theo mã màu)")
+
+st.dataframe(
+    batch_mean_df,
+    use_container_width=True
+)
+# =========================
+# BATCH SUMMARY (FULL)
+# =========================
+batch_summary_df = (
+    coil_df
+    .groupby(["色號", "製造批號"])
+    .agg(
+        coil_count=("L", "count"),
+
+        L_mean=("L", "mean"),
+        a_mean=("a", "mean"),
+        b_mean=("b", "mean"),
+
+        L_std=("L", "std"),
+        a_std=("a", "std"),
+        b_std=("b", "std"),
+
+        L_min=("L", "min"),
+        a_min=("a", "min"),
+        b_min=("b", "min"),
+
+        L_max=("L", "max"),
+        a_max=("a", "max"),
+        b_max=("b", "max"),
+    )
+    .round(2)
+    .reset_index()
+)
+
+st.subheader("📊 Batch LAB Summary (theo mã màu)")
+st.dataframe(batch_summary_df, use_container_width=True)
+st.subheader("📈 So sánh Batch theo mã màu")
+
+metric = st.selectbox(
+    "Chọn chỉ số",
+    ["L_mean", "a_mean", "b_mean"]
+)
+
+for color in batch_summary_df["色號"].unique():
+    sub = batch_summary_df[batch_summary_df["色號"] == color]
+
+    fig, ax = plt.subplots()
+    ax.plot(sub["製造批號"], sub[metric], marker="o")
+    ax.set_title(f"{metric} – Mã màu {color}")
+    ax.set_xlabel("Batch")
+    ax.set_ylabel(metric)
+    ax.grid(True)
+
+    st.pyplot(fig)
+st.subheader("🚨 Batch lệch màu (Z-score > 2)")
+
+z_df = batch_summary_df.copy()
+
+for m in ["L_mean", "a_mean", "b_mean"]:
+    z_df[f"{m}_z"] = (
+        (z_df[m] - z_df[m].mean()) / z_df[m].std()
+    )
+
+out_df = z_df[
+    (z_df["L_mean_z"].abs() > 2) |
+    (z_df["a_mean_z"].abs() > 2) |
+    (z_df["b_mean_z"].abs() > 2)
+]
+
+if out_df.empty:
+    st.success("✅ Không có batch lệch màu bất thường")
+else:
+    st.warning("⚠️ Phát hiện batch lệch màu")
+    st.dataframe(
+        out_df[[
+            "色號", "製造批號",
+            "L_mean", "a_mean", "b_mean",
+            "coil_count"
+        ]],
+        use_container_width=True
+    )
+st.subheader("📤 Xuất báo cáo")
+
+output = io.BytesIO()
+with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    batch_summary_df.to_excel(
+        writer,
+        index=False,
+        sheet_name="Batch_Summary"
+    )
+    coil_df.to_excel(
+        writer,
+        index=False,
+        sheet_name="Coil_Data"
+    )
+
+st.download_button(
+    label="⬇️ Download Excel Report",
+    data=output.getvalue(),
+    file_name="Batch_LAB_Report.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
