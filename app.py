@@ -511,7 +511,7 @@ img_path = f"charts/{k}_line.png"
 fig.savefig(img_path, dpi=150, bbox_inches="tight")
 plt.close(fig)
 
-    download(fig, f"COMBINED_{color}_{k}.png")
+download(fig, f"COMBINED_{color}_{k}.png")
 
 
 # =========================
@@ -858,6 +858,7 @@ st.download_button(
     file_name="SPC_Distribution_Report.pdf",
     mime="application/pdf"
 )
+
 
 
 
