@@ -10,7 +10,7 @@ import math
 # =========================
 st.set_page_config(
     page_title="SPC Color Dashboard",
-    page_icon="🎨",
+    page_icon="📊",
     layout="wide"
 )
 st.markdown(
@@ -521,6 +521,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
