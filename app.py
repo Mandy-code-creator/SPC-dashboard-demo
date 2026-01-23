@@ -757,28 +757,33 @@ else:
 
 # ======================================================
 # ======================================================
-# 📏 CROSS-WEB THICKNESS SPC – LINE ONLY (SAFE VERSION)
+# 📏 CROSS-WEB THICKNESS SPC – LINE ONLY (SPC-SOURCE SAFE)
 # ======================================================
 
 st.markdown("---")
 st.markdown("## 📏 Cross-Web Thickness SPC (LINE)")
 
 # =========================
-# GET LINE SOURCE DATA SAFELY
+# GET LINE SOURCE FROM SPC
 # =========================
-if "line_df" in globals():
-    source_df = line_df.copy()
-elif "df_line" in globals():
-    source_df = df_line.copy()
-elif "line_data" in globals():
-    source_df = line_data.copy()
-else:
-    st.error("❌ LINE dataframe not found (line_df / df_line / line_data)")
+try:
+    # Lấy danh sách batch LINE đã dùng cho SPC
+    batch_series = spc[next(iter(spc))]["line"]["製造批號"]
+except Exception:
+    st.error("❌ Cannot access LINE SPC source data")
     st.stop()
 
 # =========================
-# REQUIRED COLUMNS CHECK
+# REBUILD LINE DATA FROM RAW DF
 # =========================
+# ⚠️ df_raw là dataframe gốc đọc từ Google Sheet (bạn CHẮC CHẮN có)
+# Thay df_raw bằng đúng tên dataframe gốc của bạn nếu khác
+if "df_raw" not in globals():
+    st.error("❌ Raw dataframe (df_raw) not found")
+    st.stop()
+
+source_df = df_raw[df_raw["製造批號"].isin(batch_series)].copy()
+
 required_cols = [
     "製造批號",
     "Avergage Thickness (µm)正面",
@@ -787,7 +792,7 @@ required_cols = [
 ]
 
 if not all(c in source_df.columns for c in required_cols):
-    st.error("❌ Missing required thickness columns in LINE data")
+    st.error("❌ Missing thickness columns in raw data")
     st.stop()
 
 # =========================
@@ -800,9 +805,7 @@ cd_df["CD Thickness Diff (北-南)"] = (
     cd_df["Coating Thickness 正面 - 北"]
     - cd_df["Coating Thickness 正面 - 南"]
 )
-cd_df["CD Thickness Uniformity"] = (
-    cd_df["CD Thickness Diff (北-南)"].abs()
-)
+cd_df["CD Thickness Uniformity"] = cd_df["CD Thickness Diff (北-南)"].abs()
 
 # =========================
 # SPC PLOT FUNCTION
@@ -846,25 +849,10 @@ def plot_spc(df, value_col, title, target=None):
 # =========================
 # RENDER SPC
 # =========================
-plot_spc(
-    cd_df,
-    "CD Avg Thickness",
-    "CD Average Thickness (Target = 25 µm)",
-    target=25
-)
+plot_spc(cd_df, "CD Avg Thickness", "CD Average Thickness (Target = 25 µm)", target=25)
+plot_spc(cd_df, "CD Thickness Diff (北-南)", "CD Thickness Difference (North - South)", target=0)
+plot_spc(cd_df, "CD Thickness Uniformity", "CD Thickness Uniformity |North - South|")
 
-plot_spc(
-    cd_df,
-    "CD Thickness Diff (北-南)",
-    "CD Thickness Difference (North - South)",
-    target=0
-)
-
-plot_spc(
-    cd_df,
-    "CD Thickness Uniformity",
-    "CD Thickness Uniformity |North - South|"
-)
 
 
 
