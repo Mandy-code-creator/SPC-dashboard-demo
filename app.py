@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import numpy as np
-import math
 import urllib.request
 
 # =========================
@@ -62,7 +61,7 @@ st.markdown(
 )
 
 # =========================
-# GOOGLE SHEET LINKS (FIXED)
+# GOOGLE SHEET LINKS
 # =========================
 DATA_URL = (
     "https://docs.google.com/spreadsheets/d/"
@@ -76,8 +75,11 @@ LIMIT_URL = (
     "export?format=csv&gid=0"
 )
 
+COLOR_COL = "塗料編號"
+BATCH_COL = "製造批號"
+
 # =========================
-# LOAD DATA (ROBUST)
+# LOAD DATA
 # =========================
 @st.cache_data(ttl=300)
 def load_data(url):
@@ -88,7 +90,6 @@ def load_data(url):
     with urllib.request.urlopen(req) as response:
         df = pd.read_csv(response)
     return df
-
 
 df = load_data(DATA_URL)
 limit_df = load_data(LIMIT_URL)
@@ -106,34 +107,40 @@ df.columns = (
 )
 
 # =========================
-# TIME COLUMN (SAFE)
+# TIME COLUMN
 # =========================
 if "Time" in df.columns:
     df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
 
 st.success("✅ Google Sheets loaded successfully")
-st.write(df.head())
-# =========================
-# COLOR CODE FILTER
-# =========================
-st.sidebar.header("🎨 Bộ lọc mã màu")
 
-color_list = sorted(df["色號"].dropna().unique())
+# =========================
+# COLOR FILTER
+# =========================
+st.sidebar.header("🎨 Bộ lọc 塗料編號")
+
+color_list = sorted(df[COLOR_COL].dropna().unique())
 selected_colors = st.sidebar.multiselect(
-    "Chọn mã màu",
+    "Chọn 塗料編號",
     color_list,
     default=color_list
 )
 
-filtered_df = df[df["色號"].isin(selected_colors)]
+filtered_df = df[df[COLOR_COL].isin(selected_colors)]
+
+# =========================
+# CALC PER COIL
+# =========================
 def calc_per_coil(df):
-    tmp = df[[
-        "製造批號",
-        "色號",
-        "正-北 ΔL", "正-南 ΔL",
-        "正-北 Δa", "正-南 Δa",
-        "正-北 Δb", "正-南 Δb"
-    ]].copy()
+    tmp = df[
+        [
+            BATCH_COL,
+            COLOR_COL,
+            "正-北 ΔL", "正-南 ΔL",
+            "正-北 Δa", "正-南 Δa",
+            "正-北 Δb", "正-南 Δb"
+        ]
+    ].copy()
 
     tmp = tmp.dropna()
 
@@ -141,12 +148,16 @@ def calc_per_coil(df):
     tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
     tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
-    return tmp[["製造批號", "色號", "L", "a", "b"]]
+    return tmp[[BATCH_COL, COLOR_COL, "L", "a", "b"]]
 
 coil_df = calc_per_coil(filtered_df)
+
+# =========================
+# BATCH MEAN
+# =========================
 batch_mean_df = (
     coil_df
-    .groupby(["色號", "製造批號"])
+    .groupby([COLOR_COL, BATCH_COL])
     .agg(
         coil_count=("L", "count"),
         L_mean=("L", "mean"),
@@ -156,18 +167,16 @@ batch_mean_df = (
     .round(2)
     .reset_index()
 )
-st.subheader("📊 Batch LAB Mean (theo mã màu)")
 
-st.dataframe(
-    batch_mean_df,
-    use_container_width=True
-)
+st.subheader("📊 Batch LAB Mean (theo 塗料編號)")
+st.dataframe(batch_mean_df, use_container_width=True)
+
 # =========================
-# BATCH SUMMARY (FULL)
+# BATCH SUMMARY
 # =========================
 batch_summary_df = (
     coil_df
-    .groupby(["色號", "製造批號"])
+    .groupby([COLOR_COL, BATCH_COL])
     .agg(
         coil_count=("L", "count"),
 
@@ -191,34 +200,40 @@ batch_summary_df = (
     .reset_index()
 )
 
-st.subheader("📊 Batch LAB Summary (theo mã màu)")
+st.subheader("📊 Batch LAB Summary (theo 塗料編號)")
 st.dataframe(batch_summary_df, use_container_width=True)
-st.subheader("📈 So sánh Batch theo mã màu")
+
+# =========================
+# TREND CHART
+# =========================
+st.subheader("📈 So sánh Batch theo 塗料編號")
 
 metric = st.selectbox(
     "Chọn chỉ số",
     ["L_mean", "a_mean", "b_mean"]
 )
 
-for color in batch_summary_df["色號"].unique():
-    sub = batch_summary_df[batch_summary_df["色號"] == color]
+for color in batch_summary_df[COLOR_COL].unique():
+    sub = batch_summary_df[batch_summary_df[COLOR_COL] == color]
 
     fig, ax = plt.subplots()
-    ax.plot(sub["製造批號"], sub[metric], marker="o")
-    ax.set_title(f"{metric} – Mã màu {color}")
+    ax.plot(sub[BATCH_COL], sub[metric], marker="o")
+    ax.set_title(f"{metric} – 塗料編號 {color}")
     ax.set_xlabel("Batch")
     ax.set_ylabel(metric)
     ax.grid(True)
 
     st.pyplot(fig)
+
+# =========================
+# Z-SCORE OUTLIER
+# =========================
 st.subheader("🚨 Batch lệch màu (Z-score > 2)")
 
 z_df = batch_summary_df.copy()
 
 for m in ["L_mean", "a_mean", "b_mean"]:
-    z_df[f"{m}_z"] = (
-        (z_df[m] - z_df[m].mean()) / z_df[m].std()
-    )
+    z_df[f"{m}_z"] = (z_df[m] - z_df[m].mean()) / z_df[m].std()
 
 out_df = z_df[
     (z_df["L_mean_z"].abs() > 2) |
@@ -231,13 +246,22 @@ if out_df.empty:
 else:
     st.warning("⚠️ Phát hiện batch lệch màu")
     st.dataframe(
-        out_df[[
-            "色號", "製造批號",
-            "L_mean", "a_mean", "b_mean",
-            "coil_count"
-        ]],
+        out_df[
+            [
+                COLOR_COL,
+                BATCH_COL,
+                "L_mean",
+                "a_mean",
+                "b_mean",
+                "coil_count"
+            ]
+        ],
         use_container_width=True
     )
+
+# =========================
+# EXPORT EXCEL
+# =========================
 st.subheader("📤 Xuất báo cáo")
 
 output = io.BytesIO()
@@ -259,4 +283,3 @@ st.download_button(
     file_name="Batch_LAB_Report.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
-
