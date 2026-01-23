@@ -479,35 +479,6 @@ def normal_pdf(x, mean, std):
 
 
 # =========================
-# =========================
-# LINE PROCESS DISTRIBUTION
-# =========================
-import altair as alt
-import pandas as pd
-import numpy as np
-import streamlit as st
-
-# ---- Capability calculation (NO PPK)
-def calc_capability(values, lcl, ucl):
-    if lcl is None or ucl is None:
-        return None, None, None
-
-    mean = values.mean()
-    std = values.std()
-
-    if std == 0 or np.isnan(std):
-        return None, None, None
-
-    cp = (ucl - lcl) / (6 * std)
-    cpk = min(
-        (ucl - mean) / (3 * std),
-        (mean - lcl) / (3 * std)
-    )
-    ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
-
-    return round(ca, 2), round(cp, 2), round(cpk, 2)
-
-
 st.markdown("---")
 st.markdown("## 📈 Line Process Distribution Dashboard")
 
@@ -515,116 +486,94 @@ cols = st.columns(3)
 
 for i, k in enumerate(spc):
     with cols[i]:
-
         values = spc[k]["line"]["value"].dropna()
-        lcl, ucl = get_limit(color, k, "LINE")
+        lsl, usl = get_limit(color, k, "LINE")
+
+        if len(values) < 2:
+            st.warning("Not enough data")
+            continue
 
         mean = values.mean()
-        std = values.std()
+        std = values.std(ddof=1)
 
-        ca, cp, cpk = calc_capability(values, lcl, ucl)
+        ca, cp, cpk = calc_capability(values, lsl, usl)
 
-        df = pd.DataFrame({"value": values})
+        fig, ax = plt.subplots(figsize=(5, 4))
 
-        # ===== Histogram
-        hist = alt.Chart(df).mark_bar().encode(
-            x=alt.X(
-                "value:Q",
-                bin=alt.Bin(maxbins=10),
-                title="Value"
-            ),
-            y=alt.Y("count()", title="Count"),
-            color=alt.condition(
-                (alt.datum.value < lcl) | (alt.datum.value > ucl)
-                if lcl is not None and ucl is not None else alt.value(False),
-                alt.value("red"),
-                alt.value("#4dabf7")
-            ),
-            tooltip=[
-                alt.Tooltip("value:Q", title="Value", format=".3f"),
-                alt.Tooltip("count()", title="Count")
-            ]
-        ).properties(
-            width=280,
-            height=240
+        # Histogram
+        bins = np.histogram_bin_edges(values, bins=12)
+        counts, bins, patches = ax.hist(
+            values,
+            bins=bins,
+            color="#74c0fc",
+            edgecolor="white",
+            alpha=0.85
         )
 
-        # ===== Normal curve (±3σ – kéo dài đuôi)
-        normal = alt.Chart(pd.DataFrame())
+        # Highlight out-of-spec bins
+        if lsl is not None and usl is not None:
+            for p, l, r in zip(patches, bins[:-1], bins[1:]):
+                center = (l + r) / 2
+                if center < lsl or center > usl:
+                    p.set_facecolor("#ff6b6b")
 
+        # Normal curve (kéo dài đuôi 2 bên)
         if std > 0:
-            x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
-            y = (
-                (1 / (std * np.sqrt(2 * np.pi))) *
-                np.exp(-0.5 * ((x - mean) / std) ** 2)
+            x = np.linspace(
+                min(values.min(), lsl or values.min()) - 3 * std,
+                max(values.max(), usl or values.max()) + 3 * std,
+                400
             )
-
-            normal_df = pd.DataFrame({"x": x, "y": y})
-
-            normal = alt.Chart(normal_df).mark_line(
+            pdf = normal_pdf(x, mean, std)
+            ax.plot(
+                x,
+                pdf * len(values) * (bins[1] - bins[0]),
                 color="black",
-                strokeWidth=2
-            ).encode(
-                x="x:Q",
-                y=alt.Y("y:Q", title="Density"),
-                tooltip=[
-                    alt.Tooltip("x:Q", title="Value", format=".3f"),
-                    alt.Tooltip("y:Q", title="Density", format=".4f")
-                ]
+                linewidth=2,
+                label="Normal"
             )
 
-        # ===== USL / LSL vertical lines
-        rules = []
+        # USL / LSL lines
+        if lsl is not None:
+            ax.axvline(lsl, color="red", linestyle="--", linewidth=2, label="LSL")
+        if usl is not None:
+            ax.axvline(usl, color="red", linestyle="--", linewidth=2, label="USL")
 
-        if lcl is not None:
-            lsl_df = pd.DataFrame({"x": [lcl], "label": ["LSL"]})
-            rules.append(
-                alt.Chart(lsl_df).mark_rule(
-                    color="red",
-                    strokeDash=[6, 4],
-                    strokeWidth=2
-                ).encode(
-                    x="x:Q",
-                    tooltip=[
-                        alt.Tooltip("label:N"),
-                        alt.Tooltip("x:Q", title="LSL", format=".3f")
-                    ]
-                )
-            )
+        # Mean line
+        ax.axvline(mean, color="green", linestyle="-.", linewidth=2, label="Mean")
 
-        if ucl is not None:
-            usl_df = pd.DataFrame({"x": [ucl], "label": ["USL"]})
-            rules.append(
-                alt.Chart(usl_df).mark_rule(
-                    color="red",
-                    strokeDash=[6, 4],
-                    strokeWidth=2
-                ).encode(
-                    x="x:Q",
-                    tooltip=[
-                        alt.Tooltip("label:N"),
-                        alt.Tooltip("x:Q", title="USL", format=".3f")
-                    ]
-                )
-            )
-
-        # ===== Combine chart
-        chart = hist + normal
-        for r in rules:
-            chart += r
-
-        st.altair_chart(chart, use_container_width=True)
-
-        # ===== Capability display
+        # Capability box
         if cp is not None:
-            st.markdown(
-                f"""
-                **{k}**  
-                Ca = `{ca}`  
-                Cp = `{cp}`  
-                Cpk = `{cpk}`
-                """
+            ax.text(
+                0.98, 0.95,
+                f"Ca  = {ca}\nCp  = {cp}\nCpk = {cpk}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=9,
+                bbox=dict(facecolor="white", alpha=0.9)
             )
+
+        ax.set_title(f"{k} – LINE")
+        ax.set_ylabel("Count")
+        ax.grid(axis="y", alpha=0.3)
+        ax.legend(fontsize=8)
+
+        st.pyplot(fig)
+
+        # ===== DOWNLOAD IMAGE =====
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+        buf.seek(0)
+
+        st.download_button(
+            label="📥 Download chart",
+            data=buf,
+            file_name=f"{k}_line_distribution.png",
+            mime="image/png"
+        )
+
+        plt.close(fig)
 
 # =========================
 # LAB PROCESS DISTRIBUTION
@@ -727,6 +676,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
