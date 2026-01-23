@@ -495,6 +495,7 @@ cols = st.columns(3)
 for i, k in enumerate(spc):
     with cols[i]:
         values = spc[k]["line"]["value"].dropna()
+
         if len(values) < 3:
             st.warning("Not enough data")
             continue
@@ -503,9 +504,12 @@ for i, k in enumerate(spc):
         std = values.std()
         lcl, ucl = get_limit(color, k, "LINE")
 
+        # ===== capability (BẮT BUỘC PHẢI Ở ĐÂY) =====
+        ca, cp, cpk = calc_capability(values, lcl, ucl)
+
         fig, ax = plt.subplots(figsize=(5, 4))
 
-        # Histogram
+        # ===== Histogram =====
         bins = np.histogram_bin_edges(values, bins=10)
         counts, _, patches = ax.hist(
             values,
@@ -515,14 +519,14 @@ for i, k in enumerate(spc):
             alpha=0.85
         )
 
-        # Highlight out-of-spec bins
+        # ===== Highlight out-of-spec bins =====
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             center = (l + r) / 2
             if lcl is not None and ucl is not None:
                 if center < lcl or center > ucl:
                     p.set_facecolor("#ff6b6b")
 
-        # Normal curve (long tail)
+        # ===== Normal curve (long tail) =====
         if std > 0:
             x = np.linspace(mean - 4 * std, mean + 4 * std, 500)
             pdf = normal_pdf(x, mean, std)
@@ -532,28 +536,26 @@ for i, k in enumerate(spc):
                 color="black",
                 linewidth=2
             )
-  # Capability box
-        if cp is not None:
-            ax.text(
-                0.98, 0.95,
-                f"Ca={ca}\nCp={cp}\nCpk={cpk}",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.85)
-            )
 
-        ax.set_title(f"{k} (LAB)")
-        ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
-        # USL / LSL
+        # ===== USL / LSL =====
         if lcl is not None:
             ax.axvline(lcl, color="red", linestyle="--", linewidth=1.5, label="LSL")
         if ucl is not None:
             ax.axvline(ucl, color="red", linestyle="--", linewidth=1.5, label="USL")
 
-        # Info box
+        # ===== Capability box =====
+        if cp is not None:
+            ax.text(
+                0.98, 0.95,
+                f"Ca  = {ca}\nCp  = {cp}\nCpk = {cpk}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=9,
+                bbox=dict(facecolor="white", alpha=0.9)
+            )
+
+        # ===== Info box =====
         ax.text(
             0.02, 0.95,
             f"N = {len(values)}\n"
@@ -562,15 +564,15 @@ for i, k in enumerate(spc):
             transform=ax.transAxes,
             va="top",
             fontsize=9,
-            bbox=dict(facecolor="white", alpha=0.85)
+            bbox=dict(facecolor="white", alpha=0.9)
         )
 
-        ax.set_title(k)
+        ax.set_title(f"{k} (LINE)")
         ax.grid(axis="y", alpha=0.3)
         ax.legend(fontsize=8)
 
+        # ===== SHOW FIG =====
         st.pyplot(fig)
-# =========================
 
         # =========================
         # DOWNLOAD IMAGE
@@ -587,7 +589,7 @@ for i, k in enumerate(spc):
         )
 
         # =========================
-        # BIN SUMMARY TABLE (THAY HOVER)
+        # BIN SUMMARY TABLE
         # =========================
         bin_edges = np.histogram_bin_edges(values, bins=10)
         counts, _ = np.histogram(values, bins=bin_edges)
@@ -595,19 +597,16 @@ for i, k in enumerate(spc):
 
         bin_df = pd.DataFrame({
             "Bin Range": [
-                f"{bin_edges[i]:.3f} ~ {bin_edges[i+1]:.3f}"
-                for i in range(len(bin_edges) - 1)
+                f"{bin_edges[j]:.3f} ~ {bin_edges[j+1]:.3f}"
+                for j in range(len(bin_edges) - 1)
             ],
             "Count": counts,
             "Density": (counts / (len(values) * bin_width)).round(4)
         })
 
         with st.expander("📊 Distribution bin details"):
-            st.dataframe(
-                bin_df,
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(bin_df, use_container_width=True, hide_index=True)
+
 
 # =========================
 # LAB PROCESS DISTRIBUTION
@@ -710,6 +709,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
