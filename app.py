@@ -756,21 +756,29 @@ else:
 
 
 # ======================================================
-# 📏 CROSS-WEB THICKNESS SPC – LINE ONLY
+# ======================================================
+# 📏 CROSS-WEB THICKNESS SPC – LINE ONLY (SAFE VERSION)
 # ======================================================
 
 st.markdown("---")
 st.markdown("## 📏 Cross-Web Thickness SPC (LINE)")
-st.caption(
-    "Monitoring coating thickness across web direction "
-    "(Target = 25 µm, including primer layer)"
-)
 
 # =========================
-# DATA PREPARATION (LINE)
+# GET LINE SOURCE DATA SAFELY
 # =========================
-cd_df = line_df.copy()
+if "line_df" in globals():
+    source_df = line_df.copy()
+elif "df_line" in globals():
+    source_df = df_line.copy()
+elif "line_data" in globals():
+    source_df = line_data.copy()
+else:
+    st.error("❌ LINE dataframe not found (line_df / df_line / line_data)")
+    st.stop()
 
+# =========================
+# REQUIRED COLUMNS CHECK
+# =========================
 required_cols = [
     "製造批號",
     "Avergage Thickness (µm)正面",
@@ -778,102 +786,86 @@ required_cols = [
     "Coating Thickness 正面 - 南",
 ]
 
-if not all(c in cd_df.columns for c in required_cols):
+if not all(c in source_df.columns for c in required_cols):
     st.error("❌ Missing required thickness columns in LINE data")
-else:
-    cd_df = cd_df.dropna(subset=required_cols)
+    st.stop()
 
-    cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
-    cd_df["CD Thickness Diff (北-南)"] = (
-        cd_df["Coating Thickness 正面 - 北"]
-        - cd_df["Coating Thickness 正面 - 南"]
-    )
-    cd_df["CD Thickness Uniformity"] = (
-        cd_df["CD Thickness Diff (北-南)"].abs()
-    )
+# =========================
+# DATA PREP
+# =========================
+cd_df = source_df.dropna(subset=required_cols).copy()
 
-    # =========================
-    # SPC PLOT FUNCTION
-    # =========================
-    def plot_spc(df, value_col, title, target=None):
-        mean = df[value_col].mean()
-        std = df[value_col].std()
+cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
+cd_df["CD Thickness Diff (北-南)"] = (
+    cd_df["Coating Thickness 正面 - 北"]
+    - cd_df["Coating Thickness 正面 - 南"]
+)
+cd_df["CD Thickness Uniformity"] = (
+    cd_df["CD Thickness Diff (北-南)"].abs()
+)
 
-        fig, ax = plt.subplots(figsize=(12, 4))
+# =========================
+# SPC PLOT FUNCTION
+# =========================
+def plot_spc(df, value_col, title, target=None):
+    mean = df[value_col].mean()
+    std = df[value_col].std()
 
-        ax.plot(
-            df["製造批號"],
-            df[value_col],
-            "o-",
-            linewidth=2
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(df["製造批號"], df[value_col], "o-", linewidth=2)
+
+    ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
+
+    if target is not None:
+        ax.axhline(target, linestyle="--", linewidth=2, label=f"Target {target}")
+
+    if std > 0:
+        ucl = mean + 3 * std
+        lcl = mean - 3 * std
+        ax.axhline(ucl, linestyle="--", label="+3σ")
+        ax.axhline(lcl, linestyle="--", label="-3σ")
+
+        ooc = (df[value_col] > ucl) | (df[value_col] < lcl)
+        ax.scatter(
+            df.loc[ooc, "製造批號"],
+            df.loc[ooc, value_col],
+            s=90,
+            zorder=5,
+            label="OOC"
         )
 
-        # Mean
-        ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
+    ax.set_title(title)
+    ax.set_ylabel("µm")
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.subplots_adjust(right=0.78)
 
-        # Target
-        if target is not None:
-            ax.axhline(
-                target,
-                linestyle="--",
-                linewidth=2,
-                label=f"Target = {target}"
-            )
+    st.pyplot(fig)
 
-        # 3 Sigma
-        if std > 0:
-            ucl = mean + 3 * std
-            lcl = mean - 3 * std
+# =========================
+# RENDER SPC
+# =========================
+plot_spc(
+    cd_df,
+    "CD Avg Thickness",
+    "CD Average Thickness (Target = 25 µm)",
+    target=25
+)
 
-            ax.axhline(ucl, linestyle="--", label="+3σ")
-            ax.axhline(lcl, linestyle="--", label="-3σ")
+plot_spc(
+    cd_df,
+    "CD Thickness Diff (北-南)",
+    "CD Thickness Difference (North - South)",
+    target=0
+)
 
-            ooc = (df[value_col] > ucl) | (df[value_col] < lcl)
-            ax.scatter(
-                df.loc[ooc, "製造批號"],
-                df.loc[ooc, value_col],
-                s=90,
-                zorder=5,
-                label="OOC"
-            )
+plot_spc(
+    cd_df,
+    "CD Thickness Uniformity",
+    "CD Thickness Uniformity |North - South|"
+)
 
-        ax.set_title(title)
-        ax.set_ylabel("µm")
-        ax.grid(True)
-        ax.tick_params(axis="x", rotation=45)
-        ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-        fig.subplots_adjust(right=0.78)
-
-        st.pyplot(fig)
-
-    # =========================
-    # 1️⃣ CD AVG THICKNESS
-    # =========================
-    plot_spc(
-        cd_df,
-        "CD Avg Thickness",
-        "CD Average Thickness (Target = 25 µm)",
-        target=25
-    )
-
-    # =========================
-    # 2️⃣ CD DIFF (北 - 南)
-    # =========================
-    plot_spc(
-        cd_df,
-        "CD Thickness Diff (北-南)",
-        "CD Thickness Difference (North - South)",
-        target=0
-    )
-
-    # =========================
-    # 3️⃣ CD UNIFORMITY
-    # =========================
-    plot_spc(
-        cd_df,
-        "CD Thickness Uniformity",
-        "CD Thickness Uniformity |North - South|"
-    )
 
 
 
