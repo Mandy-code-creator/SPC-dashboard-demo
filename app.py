@@ -877,7 +877,8 @@ k3.metric("Mean CD Variation (µm)", f"{coil_df['CD_Variation'].mean():.2f}")
 # =====================================
 # SPC – MEAN THICKNESS
 # =========================
-# 📈 MEAN THICKNESS SPC (PER COIL)
+# =========================
+# 📈 MEAN THICKNESS SPC (PER COIL – MONTH FILTER)
 # =========================
 
 st.markdown("---")
@@ -887,6 +888,7 @@ st.subheader("📈 Mean Thickness SPC (per Coil – colored by Paint Code)")
 req_cols = [
     "Coil No.",
     "塗料編號",
+    "Time",
     "Coating Thickness (N)",
     "Coating Thickness (S)"
 ]
@@ -896,9 +898,25 @@ if missing:
     st.error(f"❌ Missing required columns: {missing}")
     st.stop()
 
+# ---------- TIME PARSE ----------
+df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
+df = df.dropna(subset=["Time"])
+
+# ---------- MONTH SELECT ----------
+df["YearMonth"] = df["Time"].dt.to_period("M").astype(str)
+month_list = sorted(df["YearMonth"].unique())
+
+selected_month = st.selectbox(
+    "📅 Select production month",
+    month_list,
+    index=len(month_list) - 1
+)
+
+df_m = df[df["YearMonth"] == selected_month]
+
 # ---------- GROUP BY COIL ----------
 coil_df = (
-    df
+    df_m
     .groupby(["Coil No.", "塗料編號"], as_index=False)
     .agg(
         Mean_N=("Coating Thickness (N)", "mean"),
@@ -907,6 +925,10 @@ coil_df = (
 )
 
 coil_df["Mean_Thickness"] = (coil_df["Mean_N"] + coil_df["Mean_S"]) / 2
+
+if coil_df.empty:
+    st.warning("⚠️ No data for selected month")
+    st.stop()
 
 # ---------- COIL SEQUENCE ----------
 coil_df = coil_df.reset_index(drop=True)
@@ -933,16 +955,16 @@ ax.plot(
     coil_df["Coil_Seq"],
     coil_df["Mean_Thickness"],
     linewidth=1,
-    alpha=0.5
+    alpha=0.4
 )
 
 ax.axhline(cl, linestyle="--", linewidth=2, label="Center Line")
 ax.axhline(ucl, linestyle="--", color="red", label="UCL")
 ax.axhline(lcl, linestyle="--", color="red", label="LCL")
 
-ax.set_xlabel("Coil sequence")
+ax.set_xlabel("Coil sequence (within selected month)")
 ax.set_ylabel("Mean Thickness (µm)")
-ax.set_title("Mean Thickness SPC – 1 Point = 1 Coil")
+ax.set_title(f"Mean Thickness SPC – {selected_month}")
 ax.grid(True)
 
 ax.legend(
@@ -967,6 +989,7 @@ st.dataframe(
     }),
     use_container_width=True
 )
+
 
 
 
