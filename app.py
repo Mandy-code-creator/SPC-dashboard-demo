@@ -363,39 +363,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     return fig
 
 
-def spc_single(spc, title, limit, color):
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    mean = spc["value"].mean()
-    std = spc["value"].std()
-
-    # original line
-    ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-
-    # highlight out-of-limit
-    x = spc["製造批號"]
-    y = spc["value"]
-    LCL, UCL = limit
-
-    if LCL is not None and UCL is not None:
-        out = (y > UCL) | (y < LCL)
-        ax.scatter(x[out], y[out], color="red", s=80, zorder=5)
-
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
-
-    if LCL is not None:
-        ax.axhline(LCL, color="red", label="LCL")
-        ax.axhline(UCL, color="red", label="UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-
-    return fig
-
 
 def download(fig, name):
     buf = io.BytesIO()
@@ -778,6 +745,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
