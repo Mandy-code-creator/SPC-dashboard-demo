@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import urllib.request
+from io import BytesIO
 
 # =========================
 # PAGE CONFIG
@@ -12,20 +13,28 @@ st.set_page_config(
     layout="wide"
 )
 
+st.title("📦 Batch LAB Summary")
+
 # =========================
-# LOAD DATA (ROBUST)
+# DATA SOURCE SELECT
+# =========================
+st.sidebar.header("📥 Data source")
+
+source = st.sidebar.radio(
+    "Choose data source",
+    ["Google Sheet", "Upload CSV"]
+)
+
+# =========================
+# LOAD FROM GOOGLE SHEET
 # =========================
 @st.cache_data
-def load_data():
-    GOOGLE_SHEET_ID = "PASTE_YOUR_GOOGLE_SHEET_ID_HERE"
-    GID = "0"   # 👈 nếu không phải sheet đầu, đổi số này
-
+def load_from_google(sheet_id, gid):
     url = (
         f"https://docs.google.com/spreadsheets/d/"
-        f"{GOOGLE_SHEET_ID}/export?format=csv&gid={GID}"
+        f"{sheet_id}/export?format=csv&gid={gid}"
     )
 
-    # 👉 Bypass Google HTTP block
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "Mozilla/5.0"}
@@ -37,18 +46,45 @@ def load_data():
     return df
 
 
-# =========================
-# MAIN
-# =========================
-try:
-    df = load_data()
-except Exception as e:
-    st.error("❌ Không thể load Google Sheet")
-    st.info("👉 Kiểm tra: Share sheet + đúng GID")
-    st.exception(e)
-    st.stop()
+df = None
 
-st.title("📦 Batch LAB Summary")
+if source == "Google Sheet":
+    sheet_id = st.sidebar.text_input(
+        "Google Sheet ID",
+        placeholder="ví dụ: 1lqsLKSoDTbtvAsH..."
+    )
+    gid = st.sidebar.text_input(
+        "Sheet GID",
+        value="0"
+    )
+
+    if sheet_id:
+        try:
+            df = load_from_google(sheet_id, gid)
+            st.success("✅ Load Google Sheet thành công")
+        except Exception as e:
+            st.error("❌ Không load được Google Sheet")
+            st.info("👉 Kiểm tra lại ID / GID hoặc dùng Upload CSV")
+            st.exception(e)
+
+# =========================
+# LOAD FROM CSV UPLOAD
+# =========================
+if source == "Upload CSV":
+    uploaded = st.sidebar.file_uploader(
+        "Upload CSV file",
+        type=["csv"]
+    )
+    if uploaded:
+        df = pd.read_csv(uploaded)
+        st.success("✅ CSV loaded successfully")
+
+# =========================
+# STOP IF NO DATA
+# =========================
+if df is None:
+    st.warning("⬅️ Chọn nguồn dữ liệu để bắt đầu")
+    st.stop()
 
 # =========================
 # REQUIRED COLUMNS
@@ -66,7 +102,7 @@ if missing:
     st.stop()
 
 # =========================
-# CLEAN & CALC PER COIL
+# CALC PER COIL
 # =========================
 def calc_per_coil(df):
     tmp = df[required_cols].copy()
