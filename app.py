@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import urllib.request
 
 # =========================
@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # =========================
-# BACKGROUND STYLE
+# STYLE
 # =========================
 st.markdown(
     """
@@ -44,26 +44,21 @@ st.markdown(
 # =========================
 # REFRESH
 # =========================
-if st.button("🔄 Refresh data"):
+if st.button("🔄 Refresh Data"):
     st.cache_data.clear()
     st.rerun()
 
 # =========================
-# GOOGLE SHEET LINKS
+# GOOGLE SHEETS
 # =========================
-LINE_URL = (
+DATA_URL = (
     "https://docs.google.com/spreadsheets/d/"
     "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/"
     "export?format=csv&gid=0"
 )
 
-LAB_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/"
-    "export?format=csv&gid=0"
-)
-
 COLOR_COL = "塗料編號"
+BATCH_COL = "製造批號"
 
 # =========================
 # LOAD DATA
@@ -71,197 +66,210 @@ COLOR_COL = "塗料編號"
 @st.cache_data(ttl=300)
 def load_data(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req) as res:
-        return pd.read_csv(res)
+    with urllib.request.urlopen(req) as r:
+        return pd.read_csv(r)
 
-df_line = load_data(LINE_URL)
-df_lab  = load_data(LAB_URL)
+df = load_data(DATA_URL)
 
 # =========================
 # CLEAN COLUMN NAMES
 # =========================
-def clean_columns(df):
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.replace("\r", "", regex=False)
-        .str.replace("\n", "", regex=False)
-        .str.replace("　", " ", regex=False)
-        .str.strip()
-    )
-    return df
-
-df_line = clean_columns(df_line)
-df_lab  = clean_columns(df_lab)
-
-# =========================
-# AUTO DETECT BATCH COLUMN
-# =========================
-def detect_batch_col(df):
-    for c in df.columns:
-        if "batch" in c.lower() or "批" in c:
-            return c
-    return None
-
-batch_line_col = detect_batch_col(df_line)
-batch_lab_col  = detect_batch_col(df_lab)
-
-if batch_line_col is None or batch_lab_col is None:
-    st.error("❌ Cannot detect Batch column automatically")
-    st.stop()
-
-df_line["Batch"] = df_line[batch_line_col].astype(str)
-df_lab["Batch"]  = df_lab[batch_lab_col].astype(str)
-
-# =========================
-# COLOR FILTER
-# =========================
-st.sidebar.header("🎨 Color Filter")
-
-colors = sorted(
-    set(df_line[COLOR_COL].dropna().unique()) |
-    set(df_lab[COLOR_COL].dropna().unique())
+df.columns = (
+    df.columns
+    .astype(str)
+    .str.replace("\n", " ", regex=False)
+    .str.replace("\r", " ", regex=False)
+    .str.replace("　", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+    .str.strip()
 )
 
-selected_colors = st.sidebar.multiselect(
-    "Select Color Code",
-    colors,
-    default=colors
+# =========================
+# FIX DATA TYPES (CRITICAL)
+# =========================
+df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
+df = df.dropna(subset=["Time"])
+
+df[COLOR_COL] = df[COLOR_COL].astype(str).str.strip()
+df[BATCH_COL] = df[BATCH_COL].astype(str).str.strip()
+
+st.success("✅ Data loaded successfully")
+
+# =========================
+# SIDEBAR – FILTER
+# =========================
+st.sidebar.title("🎨 Filter")
+
+color = st.sidebar.selectbox(
+    "Color code",
+    sorted(df[COLOR_COL].dropna().unique())
 )
 
-df_line = df_line[df_line[COLOR_COL].isin(selected_colors)]
-df_lab  = df_lab[df_lab[COLOR_COL].isin(selected_colors)]
+df = df[df[COLOR_COL] == color]
 
-# =========================
-# CALC LINE LAB (mean per coil)
-# =========================
-def calc_line_lab(df):
+latest_year = df["Time"].dt.year.max()
+
+year = st.sidebar.selectbox(
+    "Year",
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+)
+
+month = st.sidebar.multiselect(
+    "Month (optional)",
+    sorted(df["Time"].dt.month.unique())
+)
+
+df = df[df["Time"].dt.year == year]
+if month:
+    df = df[df["Time"].dt.month.isin(month)]
+
+st.sidebar.divider()
+
+# =====================================================
+# LINE DATA
+# =====================================================
+st.header("🏭 LINE Measurement (Production)")
+
+def calc_line(df):
     tmp = df[
         [
-            "Batch", COLOR_COL,
+            COLOR_COL,
+            BATCH_COL,
             "正-北 ΔL", "正-南 ΔL",
             "正-北 Δa", "正-南 Δa",
-            "正-北 Δb", "正-南 Δb"
+            "正-北 Δb", "正-南 Δb",
         ]
     ].dropna()
 
     tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
     tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
     tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
-    return tmp[["Batch", COLOR_COL, "L", "a", "b"]]
 
-# =========================
-# CALC LAB IQC
-# =========================
-def calc_lab_iqc(df):
-    cols = [c for c in df.columns if "ΔL" in c or c.strip() == "L"]
-    tmp = df[["Batch", COLOR_COL] + cols].dropna()
-    tmp["L"] = tmp[cols].mean(axis=1)
-    return tmp[["Batch", COLOR_COL, "L"]]
+    return tmp[[COLOR_COL, BATCH_COL, "L", "a", "b"]]
 
-line_df = calc_line_lab(df_line)
-lab_df  = calc_lab_iqc(df_lab)
+line_df = calc_line(df)
 
-# =========================
-# BATCH MEAN
-# =========================
-line_batch = line_df.groupby(
-    [COLOR_COL, "Batch"]
-).agg(
-    L_mean=("L", "mean"),
-    a_mean=("a", "mean"),
-    b_mean=("b", "mean")
-).round(2).reset_index()
+line_batch = (
+    line_df
+    .groupby([COLOR_COL, BATCH_COL])
+    .agg(
+        L_LINE=("L", "mean"),
+        a_LINE=("a", "mean"),
+        b_LINE=("b", "mean"),
+        sample_count=("L", "count")
+    )
+    .round(2)
+    .reset_index()
+)
 
-lab_batch = lab_df.groupby(
-    [COLOR_COL, "Batch"]
-).agg(
-    L_mean=("L", "mean")
-).round(2).reset_index()
-
-# =========================
-# LAB vs LINE CHART
-# =========================
-st.subheader("📈 LAB vs LINE (ΔL comparison)")
-
-for color in selected_colors:
-    fig, ax = plt.subplots()
-
-    l1 = lab_batch[lab_batch[COLOR_COL] == color]
-    l2 = line_batch[line_batch[COLOR_COL] == color]
-
-    ax.plot(l1["Batch"], l1["L_mean"], "o-", label="LAB (IQC)")
-    ax.plot(l2["Batch"], l2["L_mean"], "s-", label="LINE")
-
-    ax.axhline(0, linestyle="--", color="gray")
-    ax.set_title(f"ΔL Trend – Color {color}")
-    ax.set_xlabel("Batch")
-    ax.set_ylabel("ΔL")
-    ax.legend()
-    ax.grid(True)
-
-    st.pyplot(fig)
-
-# =========================
-# SPC XBAR CHART
-# =========================
-st.subheader("📊 SPC X̄ Chart (LINE ΔL)")
-
-for color in selected_colors:
-    sub = line_batch[line_batch[COLOR_COL] == color]
-
-    mean = sub["L_mean"].mean()
-    std  = sub["L_mean"].std()
-
-    ucl = mean + 3 * std
-    lcl = mean - 3 * std
-
-    fig, ax = plt.subplots()
-    ax.plot(sub["Batch"], sub["L_mean"], marker="o")
-    ax.axhline(mean, label="Mean")
-    ax.axhline(ucl, linestyle="--", label="UCL")
-    ax.axhline(lcl, linestyle="--", label="LCL")
-
-    ax.set_title(f"SPC X̄ Chart – {color}")
-    ax.set_ylabel("ΔL")
-    ax.legend()
-    ax.grid(True)
-
-    st.pyplot(fig)
-
-# =========================
-# DISTRIBUTION
-# =========================
-st.subheader("📉 Distribution (Normal shape)")
-
-for color in selected_colors:
-    vals = line_batch[line_batch[COLOR_COL] == color]["L_mean"]
-
-    if len(vals) < 3:
-        continue
-
-    mean = vals.mean()
-    std  = vals.std()
-
-    x = np.linspace(mean - 4*std, mean + 4*std, 300)
-    y = (1/(std*np.sqrt(2*np.pi))) * np.exp(-0.5*((x-mean)/std)**2)
-
-    fig, ax = plt.subplots()
-    ax.hist(vals, bins=10, density=True, alpha=0.6)
-    ax.plot(x, y)
-
-    ax.set_title(f"ΔL Distribution – {color}")
-    ax.set_xlabel("ΔL")
-    ax.set_ylabel("Density")
-    ax.grid(True)
-
-    st.pyplot(fig)
-
-# =========================
-# DATA TABLES
-# =========================
-st.subheader("📋 LINE Batch Summary")
+st.subheader("📊 LINE – Batch Mean")
 st.dataframe(line_batch, use_container_width=True)
 
-st.subheader("📋 LAB (IQC) Batch Summary")
+# =====================================================
+# LAB (IQC)
+# =====================================================
+st.header("🧪 LAB (IQC) – Incoming Inspection (Front Side)")
+
+lab_df = df[
+    [
+        COLOR_COL,
+        BATCH_COL,
+        "入料檢測 ΔL 正面",
+        "入料檢測 Δa 正面",
+        "入料檢測 Δb 正面",
+    ]
+].dropna(subset=["入料檢測 ΔL 正面"]).copy()
+
+lab_df = lab_df.rename(columns={
+    "入料檢測 ΔL 正面": "L",
+    "入料檢測 Δa 正面": "a",
+    "入料檢測 Δb 正面": "b",
+})
+
+lab_batch = (
+    lab_df
+    .groupby([COLOR_COL, BATCH_COL])
+    .agg(
+        L_LAB=("L", "mean"),
+        a_LAB=("a", "mean"),
+        b_LAB=("b", "mean"),
+        lab_sample=("L", "count")
+    )
+    .round(2)
+    .reset_index()
+)
+
+st.subheader("📊 LAB – Batch Mean")
 st.dataframe(lab_batch, use_container_width=True)
+
+# =====================================================
+# LAB vs LINE COMPARISON
+# =====================================================
+st.header("🔍 LAB vs LINE – Color Deviation Traceability")
+
+compare = pd.merge(
+    lab_batch,
+    line_batch,
+    on=[COLOR_COL, BATCH_COL],
+    how="inner"
+)
+
+compare["Delta_E_LAB_LINE"] = np.sqrt(
+    (compare["L_LINE"] - compare["L_LAB"])**2 +
+    (compare["a_LINE"] - compare["a_LAB"])**2 +
+    (compare["b_LINE"] - compare["b_LAB"])**2
+).round(2)
+
+st.subheader("📋 LAB vs LINE Comparison Table")
+st.dataframe(compare, use_container_width=True)
+
+# =====================================================
+# COMPARISON CHART
+# =====================================================
+st.subheader("📈 LAB vs LINE Trend Chart")
+
+metric = st.selectbox("Select Metric", ["L", "a", "b"])
+
+for c in compare[COLOR_COL].unique():
+    sub = compare[compare[COLOR_COL] == c].copy()
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    ax.plot(
+        sub[BATCH_COL],
+        sub[f"{metric}_LAB"],
+        marker="o",
+        linestyle="--",
+        label="LAB (IQC)"
+    )
+
+    ax.plot(
+        sub[BATCH_COL],
+        sub[f"{metric}_LINE"],
+        marker="s",
+        linestyle="-",
+        label="LINE (Production)"
+    )
+
+    ax.set_title(f"{metric} – LAB vs LINE | Color Code {c}")
+    ax.set_xlabel("Batch")
+    ax.set_ylabel(metric)
+    ax.legend()
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+# =====================================================
+# EXPORT
+# =====================================================
+st.header("📤 Export Report")
+
+csv = compare.to_csv(index=False).encode("utf-8-sig")
+
+st.download_button(
+    "⬇️ Download LAB_vs_LINE_Report.csv",
+    csv,
+    "LAB_vs_LINE_Report.csv",
+    "text/csv"
+)
