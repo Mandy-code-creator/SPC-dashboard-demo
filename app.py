@@ -147,3 +147,37 @@ with c1:
 with c2:
     st.markdown("#### 🧪 LAB")
     st.dataframe(pd.DataFrame(summary_lab), hide_index=True)
+def batch_line_lab(df):
+    tmp = df[[
+        "製造批號",
+        "正-北 ΔL", "正-南 ΔL",
+        "正-北 Δa", "正-南 Δa",
+        "正-北 Δb", "正-南 Δb"
+    ]].dropna()
+
+    # mỗi cuộn = mean Bắc / Nam
+    tmp["ΔL"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+    tmp["Δa"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+    tmp["Δb"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+
+    # mỗi batch = mean các cuộn
+    return (
+        tmp.groupby("製造批號")[["ΔL", "Δa", "Δb"]]
+        .mean()
+        .round(2)
+        .reset_index()
+    )
+st.markdown("## 📦 Batch Color Table")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 🏭 LINE (Production)")
+    df_batch_line = batch_line_lab(df)
+    st.dataframe(df_batch_line, use_container_width=True)
+
+with col2:
+    st.markdown("### 🧪 LAB (Incoming)")
+    df_batch_lab = batch_lab(df)
+    st.dataframe(df_batch_lab, use_container_width=True)
+
