@@ -483,11 +483,12 @@ def normal_pdf(x, mean, std):
 # LINE PROCESS DISTRIBUTION
 # =========================
 
-import plotly.graph_objects as go
+import altair as alt
+import pandas as pd
 import numpy as np
 import streamlit as st
 
-# ===== Capability calculation (NO PPK)
+# ---- Capability (NO PPK)
 def calc_capability(values, lcl, ucl):
     if lcl is None or ucl is None:
         return None, None, None
@@ -516,78 +517,79 @@ cols = st.columns(3)
 for i, k in enumerate(spc):
     with cols[i]:
 
-        # ===== DATA
         values = spc[k]["line"]["value"].dropna()
+        lcl, ucl = get_limit(color, k, "LINE")
+
         mean = values.mean()
         std = values.std()
-        lcl, ucl = get_limit(color, k, "LINE")
 
         ca, cp, cpk = calc_capability(values, lcl, ucl)
 
-        # ===== FIGURE
-        fig = go.Figure()
+        df = pd.DataFrame({"value": values})
 
-        # Histogram (HOVER DATA)
-        fig.add_trace(go.Histogram(
-            x=values,
-            nbinsx=10,
-            marker_color="#4dabf7",
-            hovertemplate=
-                "Value: %{x:.3f}<br>" +
-                "Count: %{y}<extra></extra>"
-        ))
+        # ===== Histogram (hover + out-of-spec color)
+        hist = alt.Chart(df).transform_bin(
+            "bin", field="value", maxbins=10
+        ).transform_aggregate(
+            count="count()",
+            groupby=["bin", "bin_end"]
+        ).transform_calculate(
+            status=
+            f"datum.bin < {lcl} || datum.bin_end > {ucl} ? 'OOS' : 'OK'"
+            if lcl is not None and ucl is not None else "'OK'"
+        ).mark_bar().encode(
+            x=alt.X("bin:Q", title="Value"),
+            x2="bin_end:Q",
+            y=alt.Y("count:Q", title="Count"),
+            color=alt.Color(
+                "status:N",
+                scale=alt.Scale(domain=["OK", "OOS"], range=["#4dabf7", "red"]),
+                legend=None
+            ),
+            tooltip=[
+                alt.Tooltip("bin:Q", title="From", format=".3f"),
+                alt.Tooltip("bin_end:Q", title="To", format=".3f"),
+                alt.Tooltip("count:Q", title="Count"),
+                alt.Tooltip("status:N", title="Status")
+            ]
+        ).properties(
+            width=280,
+            height=240
+        )
 
         # ===== Normal curve
         if std > 0:
-            x_curve = np.linspace(values.min(), values.max(), 300)
-            y_curve = (
+            x = np.linspace(values.min(), values.max(), 200)
+            y = (
                 (1 / (std * np.sqrt(2 * np.pi))) *
-                np.exp(-0.5 * ((x_curve - mean) / std) ** 2)
+                np.exp(-0.5 * ((x - mean) / std) ** 2)
             ) * len(values) * (values.max() - values.min()) / 10
 
-            fig.add_trace(go.Scatter(
-                x=x_curve,
-                y=y_curve,
-                mode="lines",
-                line=dict(color="black"),
-                hovertemplate=
-                    "Normal<br>" +
-                    "x: %{x:.3f}<br>" +
-                    "y: %{y:.3f}<extra></extra>"
-            ))
+            normal_df = pd.DataFrame({"x": x, "y": y})
 
-        # ===== Mean & Spec limits
-        fig.add_vline(x=mean, line_dash="dot", annotation_text="Mean")
-
-        if lcl is not None and ucl is not None:
-            fig.add_vline(x=lcl, line_dash="dash", annotation_text="LCL")
-            fig.add_vline(x=ucl, line_dash="dash", annotation_text="UCL")
-
-        # ===== Capability box
-        if cp is not None:
-            fig.add_annotation(
-                x=0.98,
-                y=0.95,
-                xref="paper",
-                yref="paper",
-                text=f"Ca = {ca}<br>Cp = {cp}<br>Cpk = {cpk}",
-                showarrow=False,
-                align="right",
-                bgcolor="white",
-                bordercolor="gray"
+            normal = alt.Chart(normal_df).mark_line(color="black").encode(
+                x="x:Q",
+                y="y:Q",
+                tooltip=[
+                    alt.Tooltip("x:Q", title="Value", format=".3f"),
+                    alt.Tooltip("y:Q", title="Density", format=".3f")
+                ]
             )
+        else:
+            normal = alt.Chart(pd.DataFrame())
 
-        fig.update_layout(
-            title=k,
-            height=330,
-            bargap=0.05,
-            showlegend=False,
-            margin=dict(l=20, r=20, t=40, b=20)
-        )
+        st.altair_chart(hist + normal, use_container_width=True)
 
-        st.plotly_chart(fig, use_container_width=True)
-
-
+        # ===== Capability box (text)
+        if cp is not None:
+            st.markdown(
+                f"""
+                **{k}**  
+                Ca = `{ca}`  
+                Cp = `{cp}`  
+                Cpk = `{cpk}`
+                """
+            )
 
 # =========================
 # LAB PROCESS DISTRIBUTION
@@ -690,6 +692,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
