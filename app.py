@@ -848,6 +848,17 @@ else:
     st.success("✅ No out-of-control batches detected")
 
 
+image_paths = [f"charts/{k}_line.png" for k in spc]
+
+pdf_buf = export_pdf(image_paths)
+
+st.download_button(
+    "📄 Download PDF Report",
+    data=pdf_buf,
+    file_name="SPC_Distribution_Report.pdf",
+    mime="application/pdf"
+)
+
 
 
 
