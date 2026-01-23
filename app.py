@@ -204,7 +204,7 @@ spc = {
 # =========================
 # MAIN DASHBOARD
 # =========================
-st.title(f"🎨 SPC Color Dashboard — {color}")
+st.title(f"📊 SPC Color Dashboard — {color}")
 
 if not df.empty:
     t_min = df["Time"].min().strftime("%Y-%m-%d")
@@ -521,6 +521,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
