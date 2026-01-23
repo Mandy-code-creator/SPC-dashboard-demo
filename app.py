@@ -761,49 +761,24 @@ else:
 # =========================================================
 # 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
 # =========================================================
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+# =====================================================
+# 🎨 CROSS-WEB THICKNESS SPC (COIL-BASED)
+# =====================================================
+st.markdown("---")
+st.header("🎨 Cross-Web Thickness SPC (Coil-based)")
 
 # =========================
-# PAGE CONFIG
+# REQUIRED COLUMNS CHECK
 # =========================
-st.set_page_config(
-    page_title="Cross-Web Thickness SPC",
-    page_icon="🎨",
-    layout="wide"
-)
-
-st.title("🎨 Cross-Web Thickness SPC (Coil-based)")
-
-# =========================
-# DATA LOADING
-# =========================
-DATA_URL = "PUT_YOUR_GOOGLE_SHEET_CSV_URL_HERE"
-
-@st.cache_data
-def load_data():
-    df = pd.read_csv(DATA_URL)
-    df["Time"] = pd.to_datetime(df["Time"])
-    return df
-
-df_raw = load_data()
-
-# =========================
-# REQUIRED COLUMNS
-# =========================
-REQ_COLS = [
-    "Coil No.",
-    "塗料編號",
-    "Time",
+req_cols = [
+    "Coil No.", "塗料編號", "Time",
     "Coating Thickness 正面",
     "Coating Thickness 正面 - 北",
     "Coating Thickness 正面 - 南",
     "Avergage Thickness (µm)正面"
 ]
 
-missing = [c for c in REQ_COLS if c not in df_raw.columns]
+missing = [c for c in req_cols if c not in df_raw.columns]
 if missing:
     st.error(f"❌ Missing required columns: {missing}")
     st.stop()
@@ -811,30 +786,32 @@ if missing:
 # =========================
 # FILTERS
 # =========================
-st.sidebar.header("🔎 Filters")
+st.subheader("🔎 Filters")
 
-# Time filter
-min_t, max_t = df_raw["Time"].min(), df_raw["Time"].max()
-time_range = st.sidebar.date_input(
-    "Time range",
-    [min_t.date(), max_t.date()]
-)
+c1, c2 = st.columns(2)
 
-# Paint code filter
-paint_list = sorted(df_raw["塗料編號"].dropna().unique())
-paint_sel = st.sidebar.multiselect(
-    "Paint / Color code",
-    paint_list,
-    default=paint_list
-)
+with c1:
+    min_t, max_t = df_raw["Time"].min(), df_raw["Time"].max()
+    time_range = st.date_input(
+        "Time range",
+        [min_t.date(), max_t.date()]
+    )
 
-df = df_raw[
+with c2:
+    paint_list = sorted(df_raw["塗料編號"].dropna().unique())
+    paint_sel = st.multiselect(
+        "Paint / Color code",
+        paint_list,
+        default=paint_list
+    )
+
+df_f = df_raw[
     (df_raw["Time"].dt.date >= time_range[0]) &
     (df_raw["Time"].dt.date <= time_range[1]) &
     (df_raw["塗料編號"].isin(paint_sel))
 ]
 
-if df.empty:
+if df_f.empty:
     st.warning("No data after filtering")
     st.stop()
 
@@ -842,51 +819,34 @@ if df.empty:
 # COIL-BASED AGGREGATION
 # =========================
 coil_df = (
-    df
+    df_f
     .groupby(["Coil No.", "塗料編號"])
     .agg(
         Coil_Time=("Time", "min"),
         Mean_Thickness=("Avergage Thickness (µm)正面", "mean"),
         Target_Thickness=("Coating Thickness 正面", "mean"),
-        CD_Variation=(
-            "Coating Thickness 正面 - 北",
-            lambda x: np.nan
-        )
+        North=("Coating Thickness 正面 - 北", "mean"),
+        South=("Coating Thickness 正面 - 南", "mean")
     )
     .reset_index()
 )
 
-# CD variation = |North − South|
-cd_df = (
-    df.groupby("Coil No.")
-    .apply(
-        lambda x: np.abs(
-            x["Coating Thickness 正面 - 北"].mean()
-            - x["Coating Thickness 正面 - 南"].mean()
-        )
-    )
-    .reset_index(name="CD_Variation")
-)
-
-coil_df = coil_df.drop(columns="CD_Variation").merge(
-    cd_df, on="Coil No.", how="left"
-)
+coil_df["CD_Variation"] = (coil_df["North"] - coil_df["South"]).abs()
 
 # =========================
 # KPI
 # =========================
-c1, c2, c3 = st.columns(3)
-c1.metric("Coils", len(coil_df))
-c2.metric("Mean Thickness (µm)", f"{coil_df['Mean_Thickness'].mean():.2f}")
-c3.metric("Mean CD Variation (µm)", f"{coil_df['CD_Variation'].mean():.2f}")
+k1, k2, k3 = st.columns(3)
+k1.metric("Coils", len(coil_df))
+k2.metric("Mean Thickness (µm)", f"{coil_df['Mean_Thickness'].mean():.2f}")
+k3.metric("Mean CD Variation (µm)", f"{coil_df['CD_Variation'].mean():.2f}")
 
 # =========================
-# SPC CHART – THICKNESS BY COIL
+# SPC CHART
 # =========================
 st.subheader("📈 Mean Thickness SPC (per Coil)")
 
 coil_df = coil_df.sort_values("Coil_Time")
-
 mean = coil_df["Mean_Thickness"].mean()
 std = coil_df["Mean_Thickness"].std()
 ucl = mean + 3 * std
@@ -894,7 +854,7 @@ lcl = mean - 3 * std
 
 fig, ax = plt.subplots(figsize=(12, 4))
 ax.plot(coil_df["Coil_Time"], coil_df["Mean_Thickness"], marker="o")
-ax.axhline(mean, linestyle="--", linewidth=2, label="Mean")
+ax.axhline(mean, linestyle="--", label="Mean")
 ax.axhline(ucl, color="red", linestyle="--", label="UCL")
 ax.axhline(lcl, color="red", linestyle="--", label="LCL")
 ax.set_ylabel("Thickness (µm)")
@@ -904,24 +864,19 @@ st.pyplot(fig)
 # =========================
 # THICKNESS vs COLOR
 # =========================
-st.subheader("🎨 Thickness Distribution by Paint Code (per Coil)")
+st.subheader("🎨 Thickness by Paint Code (per Coil)")
 
 fig2, ax2 = plt.subplots(figsize=(10, 4))
-coil_df.boxplot(
-    column="Mean_Thickness",
-    by="塗料編號",
-    ax=ax2,
-    grid=False
-)
-ax2.set_title("")
+coil_df.boxplot(column="Mean_Thickness", by="塗料編號", ax=ax2, grid=False)
 ax2.set_ylabel("Thickness (µm)")
+ax2.set_title("")
 plt.suptitle("")
 st.pyplot(fig2)
 
 # =========================
 # CD VARIATION
 # =========================
-st.subheader("↔ CD Thickness Variation (North − South)")
+st.subheader("↔ CD Variation (North − South)")
 
 fig3, ax3 = plt.subplots(figsize=(12, 4))
 ax3.plot(coil_df["Coil_Time"], coil_df["CD_Variation"], marker="o")
@@ -929,9 +884,9 @@ ax3.set_ylabel("CD Variation (µm)")
 st.pyplot(fig3)
 
 # =========================
-# DATA TABLE
+# TABLE
 # =========================
-st.subheader("📋 Coil Summary Table")
+st.subheader("📋 Coil Summary")
 st.dataframe(
     coil_df.style.format({
         "Mean_Thickness": "{:.2f}",
@@ -940,6 +895,7 @@ st.dataframe(
     }),
     use_container_width=True
 )
+
 
 
 
