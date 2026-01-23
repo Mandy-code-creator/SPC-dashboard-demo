@@ -288,20 +288,33 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
+    # ===== original lines (GIỮ NGUYÊN) =====
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+
+    # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
-y_lab = lab["value"]
-LCL_lab, UCL_lab = lab_lim
+    y_lab = lab["value"]
+    LCL_lab, UCL_lab = lab_lim
 
+    if LCL_lab is not None and UCL_lab is not None:
+        out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
+        ax.scatter(x_lab[out_lab], y_lab[out_lab], color="red", s=80, zorder=5)
 
-if LCL_lab is not None and UCL_lab is not None:
-    out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
-    ax.scatter(x_lab[out_lab], y_lab[out_lab], color="red", s=80, zorder=5)
+    # ===== highlight LINE out-of-limit =====
+    x_line = line["製造批號"]
+    y_line = line["value"]
+    LCL_line, UCL_line = line_lim
 
+    if LCL_line is not None and UCL_line is not None:
+        out_line = (y_line > UCL_line) | (y_line < LCL_line)
+        ax.scatter(x_line[out_line], y_line[out_line], color="red", s=80, zorder=5)
+
+    # ===== sigma lines =====
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
+    # ===== control limits =====
     if lab_lim[0] is not None:
         ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
         ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
@@ -315,6 +328,7 @@ if LCL_lab is not None and UCL_lab is not None:
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
+
     return fig
 
 
@@ -324,28 +338,31 @@ def spc_single(spc, title, limit, color):
     mean = spc["value"].mean()
     std = spc["value"].std()
 
+    # original line
     ax.plot(spc["製造批號"], spc["value"], "o-", color=color)
-    # highlight out-of-limit points
-x = spc["製造批號"]
-y = spc["value"]
-LCL, UCL = limit
 
-if LCL is not None and UCL is not None:
-    out = (y > UCL) | (y < LCL)
-    ax.scatter(x[out], y[out], color="red", s=80, zorder=5)
+    # highlight out-of-limit
+    x = spc["製造批號"]
+    y = spc["value"]
+    LCL, UCL = limit
+
+    if LCL is not None and UCL is not None:
+        out = (y > UCL) | (y < LCL)
+        ax.scatter(x[out], y[out], color="red", s=80, zorder=5)
 
     ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
     ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
 
-    if limit[0] is not None:
-        ax.axhline(limit[0], color="red", label="LCL")
-        ax.axhline(limit[1], color="red", label="UCL")
+    if LCL is not None:
+        ax.axhline(LCL, color="red", label="LCL")
+        ax.axhline(UCL, color="red", label="UCL")
 
     ax.set_title(title)
     ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
+
     return fig
 
 
@@ -489,6 +506,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
