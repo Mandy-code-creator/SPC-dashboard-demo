@@ -447,14 +447,16 @@ for k in spc:
 
 
 # =========================
+# =========================
 # DISTRIBUTION DASHBOARD
 # =========================
+
 def calc_capability(values, lcl, ucl):
     if lcl is None or ucl is None:
         return None, None, None, None
 
     mean = values.mean()
-    std = values.std()
+    std = values.std(ddof=1)  # SPC standard
 
     if std == 0 or np.isnan(std):
         return None, None, None, None
@@ -466,67 +468,34 @@ def calc_capability(values, lcl, ucl):
     )
     ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
 
-    # Với dữ liệu batch → Ppk ≈ Cpk
+    # Short-term batch data
     ppk = cpk
 
     return round(ca, 2), round(cp, 2), round(cpk, 2), round(ppk, 2)
 
-st.markdown("---")
-st.markdown("## 📈 Line Process Distribution Dashboard")
 
 def normal_pdf(x, mean, std):
     return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
         -0.5 * ((x - mean) / std) ** 2
     )
 
-cols = st.columns(3)
+
+# =========================
+# LINE PROCESS DISTRIBUTION
+# =========================
+st.markdown("---")
+st.markdown("## 📈 Line Process Distribution Dashboard")
+
+cols = st.columns(len(spc))
 
 for i, k in enumerate(spc):
     with cols[i]:
         values = spc[k]["line"]["value"].dropna()
         mean = values.mean()
-        std = values.std()
+        std = values.std(ddof=1)
         lcl, ucl = get_limit(color, k, "LINE")
 
-        fig, ax = plt.subplots(figsize=(4, 3))
-
-        bins = np.histogram_bin_edges(values, bins=10)
-        counts, _, patches = ax.hist(
-            values,
-            bins=bins,
-            edgecolor="white",
-            color="#4dabf7"
-        )
-
-        for p, l, r in zip(patches, bins[:-1], bins[1:]):
-            center = (l + r) / 2
-            if lcl is not None and ucl is not None:
-                if center < lcl or center > ucl:
-                    p.set_facecolor("red")
-
-        if std > 0:
-            x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
-            pdf = normal_pdf(x, mean, std)
-            ax.plot(
-                x,
-                pdf * len(values) * (bins[1] - bins[0]),
-                color="black"
-            )
-
-        ax.set_title(k)
-        ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
-st.markdown("---")
-st.markdown("## 📈 LAB Process Distribution Dashboard")
-
-cols = st.columns(3)
-
-for i, k in enumerate(spc):
-    with cols[i]:
-        values = spc[k]["lab"]["value"].dropna()
-        mean = values.mean()
-        std = values.std()
-        lcl, ucl = get_limit(color, k, "LAB")
+        ca, cp, cpk, ppk = calc_capability(values, lcl, ucl)
 
         fig, ax = plt.subplots(figsize=(4, 3))
 
@@ -535,15 +504,14 @@ for i, k in enumerate(spc):
             values,
             bins=bins,
             edgecolor="white",
-            color="#1f77b4"
+            alpha=0.85
         )
 
         # Highlight out-of-spec bins
         for p, l, r in zip(patches, bins[:-1], bins[1:]):
             center = (l + r) / 2
-            if lcl is not None and ucl is not None:
-                if center < lcl or center > ucl:
-                    p.set_facecolor("red")
+            if center < lcl or center > ucl:
+                p.set_facecolor("red")
 
         # Normal curve
         if std > 0:
@@ -552,11 +520,86 @@ for i, k in enumerate(spc):
             ax.plot(
                 x,
                 pdf * len(values) * (bins[1] - bins[0]),
-                color="black"
+                linewidth=2
             )
 
-        ax.set_title(f"{k} (LAB)")
+        ax.axvline(lcl, linestyle="--")
+        ax.axvline(ucl, linestyle="--")
+        ax.set_title(f"{k} - LINE")
         ax.grid(axis="y", alpha=0.3)
+
+        if cp is not None:
+            ax.text(
+                0.98, 0.95,
+                f"Ca={ca}\nCp={cp}\nCpk={cpk}\nPpk={ppk}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=9,
+                bbox=dict(facecolor="white", alpha=0.85)
+            )
+
+        st.pyplot(fig)
+
+
+# =========================
+# LAB PROCESS DISTRIBUTION
+# =========================
+st.markdown("---")
+st.markdown("## 🧪 LAB Process Distribution Dashboard")
+
+cols = st.columns(len(spc))
+
+for i, k in enumerate(spc):
+    with cols[i]:
+        values = spc[k]["lab"]["value"].dropna()
+        mean = values.mean()
+        std = values.std(ddof=1)
+        lcl, ucl = get_limit(color, k, "LAB")
+
+        ca, cp, cpk, ppk = calc_capability(values, lcl, ucl)
+
+        fig, ax = plt.subplots(figsize=(4, 3))
+
+        bins = np.histogram_bin_edges(values, bins=10)
+        counts, _, patches = ax.hist(
+            values,
+            bins=bins,
+            edgecolor="white",
+            alpha=0.85
+        )
+
+        # Highlight out-of-spec bins
+        for p, l, r in zip(patches, bins[:-1], bins[1:]):
+            center = (l + r) / 2
+            if center < lcl or center > ucl:
+                p.set_facecolor("red")
+
+        # Normal curve
+        if std > 0:
+            x = np.linspace(mean - 3 * std, mean + 3 * std, 300)
+            pdf = normal_pdf(x, mean, std)
+            ax.plot(
+                x,
+                pdf * len(values) * (bins[1] - bins[0]),
+                linewidth=2
+            )
+
+        ax.axvline(lcl, linestyle="--")
+        ax.axvline(ucl, linestyle="--")
+        ax.set_title(f"{k} - LAB")
+        ax.grid(axis="y", alpha=0.3)
+
+        if cp is not None:
+            ax.text(
+                0.98, 0.95,
+                f"Ca={ca}\nCp={cp}\nCpk={cpk}\nPpk={ppk}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=9,
+                bbox=dict(facecolor="white", alpha=0.85)
+            )
 
         st.pyplot(fig)
 
@@ -601,6 +644,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
