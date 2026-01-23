@@ -760,56 +760,84 @@ else:
 
 # =========================================================
 # 🎯 CROSS-WEB THICKNESS SPC (LINE ONLY)
-# =========================================================
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 
 st.markdown("---")
 st.header("📏 Cross-Web Thickness (Average per Coil)")
-st.caption("Average thickness only – grouped by coil")
+st.caption("Simple & clear: Average thickness only, grouped by coil")
 
-# =========================
-# 1. COLUMN SELECTION
-# =========================
+# ======================================================
+# 1. COLUMN MAPPING (USER SELECT – NO HARD CODE)
+# ======================================================
 st.subheader("🔧 Column Mapping")
 
 coil_col = st.selectbox(
-    "Select COIL column (cuộn thép)",
-    df.columns
+    "Select COIL column (Cuộn thép)",
+    df.columns,
+    key="coil_col"
 )
 
 time_col = st.selectbox(
     "Select TIME column",
-    df.columns
+    df.columns,
+    key="time_col"
 )
 
 thickness_col = st.selectbox(
     "Select AVERAGE THICKNESS column",
-    df.columns
+    df.columns,
+    key="thickness_col"
 )
 
-# =========================
-# 2. PREPARE DATA
-# =========================
+# ------------------------------------------------------
+# Prevent duplicate column selection
+# ------------------------------------------------------
+if len({coil_col, time_col, thickness_col}) < 3:
+    st.error("❌ Coil / Time / Thickness must be 3 DIFFERENT columns")
+    st.stop()
+
+# ======================================================
+# 2. DATA PREPARATION
+# ======================================================
 df_plot = df[[coil_col, time_col, thickness_col]].copy()
 
-df_plot[time_col] = pd.to_datetime(df_plot[time_col], errors="coerce")
-df_plot = df_plot.dropna()
+# Safe datetime conversion
+df_plot[time_col] = pd.to_datetime(
+    df_plot[time_col].astype(str).str.strip(),
+    errors="coerce"
+)
 
-# =========================
+# Convert thickness to numeric
+df_plot[thickness_col] = pd.to_numeric(
+    df_plot[thickness_col],
+    errors="coerce"
+)
+
+df_plot = df_plot.dropna(subset=[coil_col, time_col, thickness_col])
+
+if df_plot.empty:
+    st.warning("⚠️ No valid data after cleaning")
+    st.stop()
+
+# ======================================================
 # 3. MONTH FILTER
-# =========================
+# ======================================================
 df_plot["Month"] = df_plot[time_col].dt.to_period("M").astype(str)
 
 month_list = sorted(df_plot["Month"].unique())
-selected_month = st.selectbox("📅 Select month", month_list)
+
+selected_month = st.selectbox(
+    "📅 Select month",
+    month_list
+)
 
 df_plot = df_plot[df_plot["Month"] == selected_month]
 
-# =========================
-# 4. GROUP BY COIL
-# =========================
+# ======================================================
+# 4. GROUP BY COIL (AVERAGE ONLY)
+# ======================================================
 coil_df = (
     df_plot
     .groupby(coil_col, as_index=False)
@@ -818,9 +846,11 @@ coil_df = (
 
 coil_df = coil_df.sort_values(coil_col)
 
-# =========================
-# 5. BAR CHART (EASY TO READ)
-# =========================
+# ======================================================
+# 5. BAR CHART – EASY TO UNDERSTAND
+# ======================================================
+st.subheader("📊 Average Thickness by Coil")
+
 fig, ax = plt.subplots(figsize=(14, 4))
 
 ax.bar(
@@ -837,20 +867,21 @@ ax.axhline(
     label=f"Mean = {mean_val:.2f}"
 )
 
-ax.set_title("Average Coating Thickness by Coil")
 ax.set_xlabel("Coil")
 ax.set_ylabel("Average Thickness (µm)")
+ax.set_title("Average Coating Thickness per Coil")
 ax.legend()
 
 plt.xticks(rotation=90)
 st.pyplot(fig)
 
-# =========================
-# 6. DISTRIBUTION CHART
-# =========================
-st.subheader("📊 Thickness Distribution")
+# ======================================================
+# 6. DISTRIBUTION (VERY SIMPLE)
+# ======================================================
+st.subheader("📈 Thickness Distribution (per Coil)")
 
 fig2, ax2 = plt.subplots(figsize=(6, 4))
+
 ax2.hist(coil_df[thickness_col], bins=10)
 ax2.set_xlabel("Average Thickness (µm)")
 ax2.set_ylabel("Number of Coils")
