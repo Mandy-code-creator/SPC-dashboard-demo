@@ -163,7 +163,9 @@ def prep_spc(df, north, south):
     tmp = df[["製造批號", "Time", north, south]].copy()
 
     # giá trị của 1 CUỘN = mean(Bắc, Nam)
-    tmp["coil_value"] = tmp[[north, south]].mean(axis=1)
+   tmp = tmp.dropna(subset=[north, south])
+tmp["coil_value"] = tmp[[north, south]].mean(axis=1)
+
 
     # bỏ cuộn lỗi
     tmp = tmp.dropna(subset=["coil_value"])
@@ -491,6 +493,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
