@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import io
-import math
+import urllib.request
 
 # =========================
 # PAGE CONFIG
@@ -14,107 +13,255 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎨 SPC Color Dashboard")
+# =========================
+# BACKGROUND STYLE
+# =========================
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(
+            270deg,
+            #ffffff,
+            #f0f9ff,
+            #e0f2fe,
+            #fef3c7,
+            #ecfeff
+        );
+        background-size: 800% 800%;
+        animation: gradientBG 20s ease infinite;
+    }
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # =========================
-# NORMAL DISTRIBUTION (NO SCIPY)
+# REFRESH
 # =========================
-def normal_pdf(x, mean, std):
-    return (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mean) / std) ** 2)
+if st.button("🔄 Refresh data"):
+    st.cache_data.clear()
+    st.rerun()
+
+# =========================
+# GOOGLE SHEET LINKS
+# =========================
+LINE_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/"
+    "export?format=csv&gid=0"
+)
+
+LAB_URL = (
+    "https://docs.google.com/spreadsheets/d/"
+    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/"
+    "export?format=csv&gid=0"
+)
+
+COLOR_COL = "塗料編號"
 
 # =========================
 # LOAD DATA
 # =========================
-DATA_URL = "https://docs.google.com/spreadsheets/d/1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/export?format=csv"
-LAB_URL  = "https://docs.google.com/spreadsheets/d/1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/export?format=csv"
+@st.cache_data(ttl=300)
+def load_data(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as res:
+        return pd.read_csv(res)
 
-@st.cache_data
-def load_data():
-    line = pd.read_csv(DATA_URL)
-    lab  = pd.read_csv(LAB_URL)
-    return line, lab
-
-df_line, df_lab = load_data()
+df_line = load_data(LINE_URL)
+df_lab  = load_data(LAB_URL)
 
 # =========================
-# STANDARDIZE COLUMNS
+# CLEAN COLUMN NAMES
 # =========================
-df_line["Batch"] = df_line["Batch"].astype(str)
-df_lab["Batch"]  = df_lab["Batch"].astype(str)
+def clean_columns(df):
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.replace("\r", "", regex=False)
+        .str.replace("\n", "", regex=False)
+        .str.replace("　", " ", regex=False)
+        .str.strip()
+    )
+    return df
 
-# =========================
-# FILTER
-# =========================
-color_list = sorted(df_line["塗料編號"].dropna().unique())
-color = st.selectbox("Select Color Code", color_list)
-
-line_f = df_line[df_line["塗料編號"] == color]
-lab_f  = df_lab[df_lab["塗料編號"] == color]
-
-# =========================
-# COMPUTE DELTA E
-# =========================
-def delta_e(df):
-    if {"L","a","b"}.issubset(df.columns):
-        return np.sqrt(df["L"]**2 + df["a"]**2 + df["b"]**2)
-    else:
-        return abs(df["L"])
-
-line_f["DeltaE"] = delta_e(line_f)
-lab_f["DeltaE"]  = delta_e(lab_f)
+df_line = clean_columns(df_line)
+df_lab  = clean_columns(df_lab)
 
 # =========================
-# CHART FIRST
+# AUTO DETECT BATCH COLUMN
 # =========================
-st.subheader("📈 LAB vs LINE Trend")
+def detect_batch_col(df):
+    for c in df.columns:
+        if "batch" in c.lower() or "批" in c:
+            return c
+    return None
 
-fig, ax = plt.subplots()
-ax.plot(lab_f["Batch"], lab_f["DeltaE"], marker="o", label="LAB (Incoming / IQC)")
-ax.plot(line_f["Batch"], line_f["DeltaE"], marker="s", label="LINE")
-ax.axhline(0.5, linestyle="--", label="LAB Limit (0.5)")
-ax.axhline(1.0, linestyle="--", label="LINE Limit (1.0)")
-ax.legend()
-ax.set_xlabel("Batch")
-ax.set_ylabel("Delta E")
-st.pyplot(fig)
+batch_line_col = detect_batch_col(df_line)
+batch_lab_col  = detect_batch_col(df_lab)
+
+if batch_line_col is None or batch_lab_col is None:
+    st.error("❌ Cannot detect Batch column automatically")
+    st.stop()
+
+df_line["Batch"] = df_line[batch_line_col].astype(str)
+df_lab["Batch"]  = df_lab[batch_lab_col].astype(str)
 
 # =========================
-# SPC CHART
+# COLOR FILTER
 # =========================
-st.subheader("📊 SPC Chart")
+st.sidebar.header("🎨 Color Filter")
 
-mean = line_f["DeltaE"].mean()
-std  = line_f["DeltaE"].std()
+colors = sorted(
+    set(df_line[COLOR_COL].dropna().unique()) |
+    set(df_lab[COLOR_COL].dropna().unique())
+)
 
-ucl = mean + 3*std
-lcl = mean - 3*std
+selected_colors = st.sidebar.multiselect(
+    "Select Color Code",
+    colors,
+    default=colors
+)
 
-fig2, ax2 = plt.subplots()
-ax2.plot(line_f["Batch"], line_f["DeltaE"], marker="o")
-ax2.axhline(mean, label="Mean")
-ax2.axhline(ucl, linestyle="--", label="UCL")
-ax2.axhline(lcl, linestyle="--", label="LCL")
-ax2.legend()
-st.pyplot(fig2)
+df_line = df_line[df_line[COLOR_COL].isin(selected_colors)]
+df_lab  = df_lab[df_lab[COLOR_COL].isin(selected_colors)]
+
+# =========================
+# CALC LINE LAB (mean per coil)
+# =========================
+def calc_line_lab(df):
+    tmp = df[
+        [
+            "Batch", COLOR_COL,
+            "正-北 ΔL", "正-南 ΔL",
+            "正-北 Δa", "正-南 Δa",
+            "正-北 Δb", "正-南 Δb"
+        ]
+    ].dropna()
+
+    tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+    tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+    tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+    return tmp[["Batch", COLOR_COL, "L", "a", "b"]]
+
+# =========================
+# CALC LAB IQC
+# =========================
+def calc_lab_iqc(df):
+    cols = [c for c in df.columns if "ΔL" in c or c.strip() == "L"]
+    tmp = df[["Batch", COLOR_COL] + cols].dropna()
+    tmp["L"] = tmp[cols].mean(axis=1)
+    return tmp[["Batch", COLOR_COL, "L"]]
+
+line_df = calc_line_lab(df_line)
+lab_df  = calc_lab_iqc(df_lab)
+
+# =========================
+# BATCH MEAN
+# =========================
+line_batch = line_df.groupby(
+    [COLOR_COL, "Batch"]
+).agg(
+    L_mean=("L", "mean"),
+    a_mean=("a", "mean"),
+    b_mean=("b", "mean")
+).round(2).reset_index()
+
+lab_batch = lab_df.groupby(
+    [COLOR_COL, "Batch"]
+).agg(
+    L_mean=("L", "mean")
+).round(2).reset_index()
+
+# =========================
+# LAB vs LINE CHART
+# =========================
+st.subheader("📈 LAB vs LINE (ΔL comparison)")
+
+for color in selected_colors:
+    fig, ax = plt.subplots()
+
+    l1 = lab_batch[lab_batch[COLOR_COL] == color]
+    l2 = line_batch[line_batch[COLOR_COL] == color]
+
+    ax.plot(l1["Batch"], l1["L_mean"], "o-", label="LAB (IQC)")
+    ax.plot(l2["Batch"], l2["L_mean"], "s-", label="LINE")
+
+    ax.axhline(0, linestyle="--", color="gray")
+    ax.set_title(f"ΔL Trend – Color {color}")
+    ax.set_xlabel("Batch")
+    ax.set_ylabel("ΔL")
+    ax.legend()
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+# =========================
+# SPC XBAR CHART
+# =========================
+st.subheader("📊 SPC X̄ Chart (LINE ΔL)")
+
+for color in selected_colors:
+    sub = line_batch[line_batch[COLOR_COL] == color]
+
+    mean = sub["L_mean"].mean()
+    std  = sub["L_mean"].std()
+
+    ucl = mean + 3 * std
+    lcl = mean - 3 * std
+
+    fig, ax = plt.subplots()
+    ax.plot(sub["Batch"], sub["L_mean"], marker="o")
+    ax.axhline(mean, label="Mean")
+    ax.axhline(ucl, linestyle="--", label="UCL")
+    ax.axhline(lcl, linestyle="--", label="LCL")
+
+    ax.set_title(f"SPC X̄ Chart – {color}")
+    ax.set_ylabel("ΔL")
+    ax.legend()
+    ax.grid(True)
+
+    st.pyplot(fig)
 
 # =========================
 # DISTRIBUTION
 # =========================
-st.subheader("📉 Distribution")
+st.subheader("📉 Distribution (Normal shape)")
 
-data = line_f["DeltaE"]
-x = np.linspace(data.min(), data.max(), 200)
+for color in selected_colors:
+    vals = line_batch[line_batch[COLOR_COL] == color]["L_mean"]
 
-fig3, ax3 = plt.subplots()
-ax3.hist(data, bins=10, density=True, alpha=0.6)
-ax3.plot(x, normal_pdf(x, mean, std))
-st.pyplot(fig3)
+    if len(vals) < 3:
+        continue
+
+    mean = vals.mean()
+    std  = vals.std()
+
+    x = np.linspace(mean - 4*std, mean + 4*std, 300)
+    y = (1/(std*np.sqrt(2*np.pi))) * np.exp(-0.5*((x-mean)/std)**2)
+
+    fig, ax = plt.subplots()
+    ax.hist(vals, bins=10, density=True, alpha=0.6)
+    ax.plot(x, y)
+
+    ax.set_title(f"ΔL Distribution – {color}")
+    ax.set_xlabel("ΔL")
+    ax.set_ylabel("Density")
+    ax.grid(True)
+
+    st.pyplot(fig)
 
 # =========================
-# TABLES
+# DATA TABLES
 # =========================
-st.subheader("📋 LAB Summary")
-st.dataframe(lab_f.groupby("Batch")["DeltaE"].mean().round(2))
+st.subheader("📋 LINE Batch Summary")
+st.dataframe(line_batch, use_container_width=True)
 
-st.subheader("📋 LINE Summary")
-st.dataframe(line_f.groupby("Batch")["DeltaE"].mean().round(2))
+st.subheader("📋 LAB (IQC) Batch Summary")
+st.dataframe(lab_batch, use_container_width=True)
