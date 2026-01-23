@@ -1,106 +1,217 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="SPC Batch Check",
+    page_title="SPC Color Dashboard",
+    page_icon="📈",
     layout="wide"
 )
 
-st.title("🔍 KIỂM TRA GIÁ TRỊ TRUNG BÌNH THEO BATCH")
+# =========================
+# TITLE
+# =========================
+st.title("📈 SPC Color Dashboard")
+st.caption("Xbar–R | Cp / Cpk | Normal Distribution")
 
 # =========================
-# LOAD DATA
+# DATA UPLOAD (FIX ERROR)
 # =========================
-@st.cache_data
-def load_data():
-    # 👉 THAY LINK CSV CỦA BẠN Ở ĐÂY
-    url = "YOUR_GOOGLE_SHEET_CSV_LINK"
-    return pd.read_csv(url)
+st.subheader("📂 Upload Data")
 
-df = load_data()
+uploaded_file = st.file_uploader(
+    "Upload CSV file",
+    type=["csv"]
+)
 
-st.markdown("### 📄 DỮ LIỆU GỐC (5 dòng đầu)")
-st.dataframe(df.head())
+if uploaded_file is None:
+    st.warning("⬆️ Please upload a CSV file to continue")
+    st.stop()
+
+df = pd.read_csv(uploaded_file)
 
 # =========================
-# KIỂM TRA TRUNG BÌNH THEO BATCH (LINE)
+# REQUIRED COLUMNS CHECK
 # =========================
-st.markdown("---")
-st.markdown("## 🧪 BẢNG TRUNG BÌNH THEO BATCH (LINE ΔL / Δa / Δb)")
-
-# 1️⃣ Giữ cuộn có đủ Bắc & Nam
 required_cols = [
-    "正-北 ΔL", "正-南 ΔL",
-    "正-北 Δa", "正-南 Δa",
-    "正-北 Δb", "正-南 Δb",
-    "顏色代碼", "製造批號"
+    "Time", "Batch",
+    "L_LINE", "a_LINE", "b_LINE",
+    "L_LAB", "a_LAB", "b_LAB"
 ]
 
-check_df = df[required_cols].dropna().copy()
+missing = [c for c in required_cols if c not in df.columns]
 
-# 2️⃣ Tính giá trị từng CUỘN
-check_df["ΔL_coil"] = check_df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
-check_df["Δa_coil"] = check_df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
-check_df["Δb_coil"] = check_df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+if missing:
+    st.error(f"❌ Missing columns: {missing}")
+    st.stop()
 
-# 3️⃣ Gộp theo BATCH
-batch_mean = (
-    check_df
-    .groupby(["顏色代碼", "製造批號"], as_index=False)
-    .agg(
-        Mean_ΔL=("ΔL_coil", "mean"),
-        Mean_Δa=("Δa_coil", "mean"),
-        Mean_Δb=("Δb_coil", "mean"),
-        Coil_Count=("Δb_coil", "count")
+df["Time"] = pd.to_datetime(df["Time"])
+
+# =========================
+# TIME RANGE
+# =========================
+st.subheader("⏱ Time Range")
+
+start_date, end_date = st.date_input(
+    "Select time range",
+    [df["Time"].min(), df["Time"].max()]
+)
+
+df = df[
+    (df["Time"] >= pd.to_datetime(start_date)) &
+    (df["Time"] <= pd.to_datetime(end_date))
+]
+
+# =========================
+# SUMMARY TABLE
+# =========================
+def summary_table(df, cols):
+    return (
+        df[cols]
+        .agg(["mean", "max", "min", "std"])
+        .T
+        .rename(columns={
+            "mean": "Mean",
+            "max": "Max",
+            "min": "Min",
+            "std": "Stdev"
+        })
+        .round(2)
+        .reset_index()
+        .rename(columns={"index": "Metric"})
     )
-)
 
-# 4️⃣ Làm tròn để so tay
-batch_mean[["Mean_ΔL", "Mean_Δa", "Mean_Δb"]] = (
-    batch_mean[["Mean_ΔL", "Mean_Δa", "Mean_Δb"]].round(2)
-)
+st.subheader("📊 Summary Statistics")
 
-# 5️⃣ HIỂN THỊ
-st.dataframe(batch_mean)
+col1, col2 = st.columns(2)
 
-# =========================
-# FILTER ĐỂ SO TAY
-# =========================
-st.markdown("---")
-st.markdown("## 🎯 LỌC ĐỂ SO TAY")
+with col1:
+    st.markdown("### 🏭 LINE")
+    st.dataframe(
+        summary_table(df, ["L_LINE", "a_LINE", "b_LINE"]),
+        use_container_width=True
+    )
 
-color_list = sorted(batch_mean["顏色代碼"].unique())
-color = st.selectbox("Chọn mã màu", color_list)
-
-batch_list = sorted(
-    batch_mean.loc[batch_mean["顏色代碼"] == color, "製造批號"].unique()
-)
-batch = st.selectbox("Chọn batch", batch_list)
-
-st.markdown("### 📌 KẾT QUẢ BATCH ĐƯỢC CHỌN")
-st.dataframe(
-    batch_mean[
-        (batch_mean["顏色代碼"] == color) &
-        (batch_mean["製造批號"] == batch)
-    ]
-)
+with col2:
+    st.markdown("### 🧪 LAB")
+    st.dataframe(
+        summary_table(df, ["L_LAB", "a_LAB", "b_LAB"]),
+        use_container_width=True
+    )
 
 # =========================
-# CHI TIẾT TỪNG CUỘN (DEBUG)
+# XBAR-R CHART (TEXTBOOK)
 # =========================
-st.markdown("---")
-st.markdown("## 🔎 CHI TIẾT TỪNG CUỘN TRONG BATCH")
+st.subheader("📈 SPC Xbar–R Chart")
 
-coil_detail = check_df[
-    (check_df["顏色代碼"] == color) &
-    (check_df["製造批號"] == batch)
-][[
-    "正-北 Δb", "正-南 Δb", "Δb_coil"
-]]
+metric = st.selectbox(
+    "Select metric",
+    ["L_LINE", "a_LINE", "b_LINE"]
+)
 
-coil_detail["Δb_coil"] = coil_detail["Δb_coil"].round(3)
+group = df.groupby("Batch")[metric]
+xbar = group.mean()
+r = group.max() - group.min()
 
-st.dataframe(coil_detail)
+xbar_bar = xbar.mean()
+r_bar = r.mean()
+
+# SPC constants (n≈5)
+A2 = 0.577
+D3 = 0
+D4 = 2.114
+
+UCLx = xbar_bar + A2 * r_bar
+LCLx = xbar_bar - A2 * r_bar
+UCLr = D4 * r_bar
+LCLr = D3 * r_bar
+
+out = (xbar > UCLx) | (xbar < LCLx)
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
+
+ax1.plot(xbar.index, xbar, marker="o")
+ax1.scatter(xbar.index[out], xbar[out], color="red", zorder=5)
+ax1.axhline(xbar_bar, linestyle="--", label="Mean")
+ax1.axhline(UCLx, color="red", linestyle="--")
+ax1.axhline(LCLx, color="red", linestyle="--")
+ax1.set_title("X̄ Chart")
+ax1.grid(True)
+
+ax2.plot(r.index, r, marker="o")
+ax2.axhline(r_bar, linestyle="--", label="R̄")
+ax2.axhline(UCLr, color="red", linestyle="--")
+ax2.axhline(LCLr, color="red", linestyle="--")
+ax2.set_title("R Chart")
+ax2.grid(True)
+
+st.pyplot(fig)
+
+# =========================
+# CP / CPK + NORMAL CURVE
+# =========================
+st.subheader("🎯 Cp / Cpk & Normal Distribution")
+
+USL = st.number_input("USL", value=float(df[metric].max()))
+LSL = st.number_input("LSL", value=float(df[metric].min()))
+
+mu = df[metric].mean()
+sigma = df[metric].std()
+
+Cp = (USL - LSL) / (6 * sigma)
+Cpk = min(
+    (USL - mu) / (3 * sigma),
+    (mu - LSL) / (3 * sigma)
+)
+
+st.metric("Cp", round(Cp, 2))
+st.metric("Cpk", round(Cpk, 2))
+
+x = np.linspace(mu - 4*sigma, mu + 4*sigma, 200)
+y = stats.norm.pdf(x, mu, sigma)
+
+fig2, ax = plt.subplots(figsize=(10, 4))
+ax.plot(x, y)
+ax.axvline(USL, color="red", linestyle="--", label="USL")
+ax.axvline(LSL, color="red", linestyle="--", label="LSL")
+ax.axvline(mu, linestyle="--", label="Mean")
+ax.legend()
+ax.grid(True)
+
+st.pyplot(fig2)
+
+# =========================
+# EXPORT PDF
+# =========================
+st.subheader("📄 Export SPC PDF")
+
+def export_pdf():
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph("SPC Report", styles["Title"]))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(f"Metric: {metric}", styles["Normal"]))
+    story.append(Paragraph(f"Cp: {Cp:.2f}", styles["Normal"]))
+    story.append(Paragraph(f"Cpk: {Cpk:.2f}", styles["Normal"]))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+st.download_button(
+    "📥 Download SPC PDF",
+    export_pdf(),
+    file_name="SPC_Report.pdf",
+    mime="application/pdf"
+)
