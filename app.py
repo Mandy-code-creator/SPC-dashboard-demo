@@ -268,25 +268,12 @@ for k in spc:
     line_max = line_values.max()
 
     lcl, ucl = get_limit(color, k, "LINE")
-
-    ca = cp = cpk = None
-    if line_std > 0 and lcl is not None and ucl is not None:
-        cp = (ucl - lcl) / (6 * line_std)
-        cpk = min(
-            (ucl - line_mean) / (3 * line_std),
-            (line_mean - lcl) / (3 * line_std)
-        )
-        ca = abs(line_mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
-
     summary_line.append({
         "Factor": k,
         "Min": round(line_min, 2),
         "Max": round(line_max, 2),
         "Mean": round(line_mean, 2),
         "Std Dev": round(line_std, 2),
-        "Ca": round(ca, 2) if ca is not None else "",
-        "Cp": round(cp, 2) if cp is not None else "",
-        "Cpk": round(cpk, 2) if cpk is not None else "",
         "n": line_n
     })
 
@@ -592,6 +579,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
