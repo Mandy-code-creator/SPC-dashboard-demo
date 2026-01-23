@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import urllib.request
 
 # =========================
 # PAGE CONFIG
@@ -12,24 +13,45 @@ st.set_page_config(
 )
 
 # =========================
-# LOAD DATA
+# LOAD DATA (ROBUST)
 # =========================
 @st.cache_data
 def load_data():
-    # 👉 CHỈ CẦN THAY ID NÀY
     GOOGLE_SHEET_ID = "PASTE_YOUR_GOOGLE_SHEET_ID_HERE"
+    GID = "0"   # 👈 nếu không phải sheet đầu, đổi số này
 
-    url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv"
-    df = pd.read_csv(url)
+    url = (
+        f"https://docs.google.com/spreadsheets/d/"
+        f"{GOOGLE_SHEET_ID}/export?format=csv&gid={GID}"
+    )
+
+    # 👉 Bypass Google HTTP block
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
+
+    with urllib.request.urlopen(req) as response:
+        df = pd.read_csv(response)
 
     return df
 
-df = load_data()
+
+# =========================
+# MAIN
+# =========================
+try:
+    df = load_data()
+except Exception as e:
+    st.error("❌ Không thể load Google Sheet")
+    st.info("👉 Kiểm tra: Share sheet + đúng GID")
+    st.exception(e)
+    st.stop()
 
 st.title("📦 Batch LAB Summary")
 
 # =========================
-# CHECK DATA
+# REQUIRED COLUMNS
 # =========================
 required_cols = [
     "製造批號",
@@ -48,11 +70,8 @@ if missing:
 # =========================
 def calc_per_coil(df):
     tmp = df[required_cols].copy()
-
-    # drop nếu thiếu đo
     tmp = tmp.dropna()
 
-    # mỗi cuộn = trung bình Bắc / Nam
     tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
     tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
     tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
@@ -93,11 +112,8 @@ batch_df = (
 # =========================
 # DISPLAY
 # =========================
-st.subheader("🔹 Batch LAB Summary Table")
+st.subheader("🔹 Batch LAB Summary")
 st.dataframe(batch_df, use_container_width=True)
 
-# =========================
-# DEBUG (OPTIONAL)
-# =========================
-with st.expander("🔍 Coil level data"):
+with st.expander("🔍 Coil-level data"):
     st.dataframe(coil_df, use_container_width=True)
