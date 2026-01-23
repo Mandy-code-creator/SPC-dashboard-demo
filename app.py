@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import io
 import numpy as np
 import urllib.request
 
@@ -14,6 +13,9 @@ st.set_page_config(
     layout="wide"
 )
 
+# =========================
+# STYLE
+# =========================
 st.markdown(
     """
     <style>
@@ -40,38 +42,18 @@ st.markdown(
 )
 
 # =========================
-# REFRESH BUTTON
+# REFRESH
 # =========================
-if st.button("🔄 Refresh data"):
+if st.button("🔄 Refresh Data"):
     st.cache_data.clear()
     st.rerun()
 
 # =========================
-# SIDEBAR STYLE
-# =========================
-st.markdown(
-    """
-    <style>
-    [data-testid="stSidebar"] {
-        background-color: #f6f8fa;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# =========================
-# GOOGLE SHEET LINKS
+# GOOGLE SHEETS
 # =========================
 DATA_URL = (
     "https://docs.google.com/spreadsheets/d/"
     "1lqsLKSoDTbtvAsHzJaEri8tPo5pA3vqJ__LVHp2R534/"
-    "export?format=csv&gid=0"
-)
-
-LIMIT_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1jbP8puBraQ5Xgs9oIpJ7PlLpjIK3sltrgbrgKUcJ-Qo/"
     "export?format=csv&gid=0"
 )
 
@@ -83,194 +65,185 @@ BATCH_COL = "製造批號"
 # =========================
 @st.cache_data(ttl=300)
 def load_data(url):
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0"}
-    )
-    with urllib.request.urlopen(req) as response:
-        df = pd.read_csv(response)
-    return df
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req) as r:
+        return pd.read_csv(r)
 
 df = load_data(DATA_URL)
-limit_df = load_data(LIMIT_URL)
 
 # =========================
-# FIX COLUMN NAMES
+# CLEAN COLUMN NAMES
 # =========================
 df.columns = (
     df.columns
-    .str.replace("\r\n", " ", regex=False)
+    .astype(str)
     .str.replace("\n", " ", regex=False)
+    .str.replace("\r", " ", regex=False)
     .str.replace("　", " ", regex=False)
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
 
-# =========================
-# TIME COLUMN
-# =========================
-if "Time" in df.columns:
-    df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
-
-st.success("✅ Google Sheets loaded successfully")
+st.success("✅ Data loaded successfully")
 
 # =========================
-# COLOR FILTER
+# SIDEBAR FILTER
 # =========================
-st.sidebar.header("🎨 Bộ lọc 塗料編號")
+st.sidebar.header("🎨 Color Code Filter")
 
 color_list = sorted(df[COLOR_COL].dropna().unique())
 selected_colors = st.sidebar.multiselect(
-    "Chọn 塗料編號",
+    "Select Color Code",
     color_list,
     default=color_list
 )
 
-filtered_df = df[df[COLOR_COL].isin(selected_colors)]
+df = df[df[COLOR_COL].isin(selected_colors)]
 
-# =========================
-# CALC PER COIL
-# =========================
-def calc_per_coil(df):
+# =====================================================
+# LINE DATA
+# =====================================================
+st.header("🏭 LINE Measurement (Production)")
+
+def calc_line(df):
     tmp = df[
         [
-            BATCH_COL,
             COLOR_COL,
+            BATCH_COL,
             "正-北 ΔL", "正-南 ΔL",
             "正-北 Δa", "正-南 Δa",
-            "正-北 Δb", "正-南 Δb"
+            "正-北 Δb", "正-南 Δb",
         ]
-    ].copy()
-
-    tmp = tmp.dropna()
+    ].dropna()
 
     tmp["L"] = tmp[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
     tmp["a"] = tmp[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
     tmp["b"] = tmp[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
-    return tmp[[BATCH_COL, COLOR_COL, "L", "a", "b"]]
+    return tmp[[COLOR_COL, BATCH_COL, "L", "a", "b"]]
 
-coil_df = calc_per_coil(filtered_df)
+line_df = calc_line(df)
 
-# =========================
-# BATCH MEAN
-# =========================
-batch_mean_df = (
-    coil_df
+line_batch = (
+    line_df
     .groupby([COLOR_COL, BATCH_COL])
     .agg(
-        coil_count=("L", "count"),
-        L_mean=("L", "mean"),
-        a_mean=("a", "mean"),
-        b_mean=("b", "mean"),
+        L_LINE=("L", "mean"),
+        a_LINE=("a", "mean"),
+        b_LINE=("b", "mean"),
+        sample_count=("L", "count")
     )
     .round(2)
     .reset_index()
 )
 
-st.subheader("📊 Batch LAB Mean (theo 塗料編號)")
-st.dataframe(batch_mean_df, use_container_width=True)
+st.subheader("📊 LINE – Batch Mean")
+st.dataframe(line_batch, use_container_width=True)
 
-# =========================
-# BATCH SUMMARY
-# =========================
-batch_summary_df = (
-    coil_df
+# =====================================================
+# LAB (IQC)
+# =====================================================
+st.header("🧪 LAB (IQC) – Incoming Inspection (Front Side)")
+
+lab_df = df[
+    [
+        COLOR_COL,
+        BATCH_COL,
+        "入料檢測 ΔL 正面",
+        "入料檢測 Δa 正面",
+        "入料檢測 Δb 正面",
+    ]
+].dropna(subset=["入料檢測 ΔL 正面"]).copy()
+
+lab_df = lab_df.rename(columns={
+    "入料檢測 ΔL 正面": "L",
+    "入料檢測 Δa 正面": "a",
+    "入料檢測 Δb 正面": "b",
+})
+
+lab_batch = (
+    lab_df
     .groupby([COLOR_COL, BATCH_COL])
     .agg(
-        coil_count=("L", "count"),
-
-        L_mean=("L", "mean"),
-        a_mean=("a", "mean"),
-        b_mean=("b", "mean"),
-
-        L_std=("L", "std"),
-        a_std=("a", "std"),
-        b_std=("b", "std"),
-
-        L_min=("L", "min"),
-        a_min=("a", "min"),
-        b_min=("b", "min"),
-
-        L_max=("L", "max"),
-        a_max=("a", "max"),
-        b_max=("b", "max"),
+        L_LAB=("L", "mean"),
+        a_LAB=("a", "mean"),
+        b_LAB=("b", "mean"),
+        lab_sample=("L", "count")
     )
     .round(2)
     .reset_index()
 )
 
-st.subheader("📊 Batch LAB Summary (theo 塗料編號)")
-st.dataframe(batch_summary_df, use_container_width=True)
+st.subheader("📊 LAB – Batch Mean")
+st.dataframe(lab_batch, use_container_width=True)
 
-# =========================
-# TREND CHART
-# =========================
-st.subheader("📈 So sánh Batch theo 塗料編號")
+# =====================================================
+# LAB vs LINE COMPARISON
+# =====================================================
+st.header("🔍 LAB vs LINE – Color Deviation Traceability")
 
-metric = st.selectbox(
-    "Chọn chỉ số",
-    ["L_mean", "a_mean", "b_mean"]
+compare = pd.merge(
+    lab_batch,
+    line_batch,
+    on=[COLOR_COL, BATCH_COL],
+    how="inner"
 )
 
-for color in batch_summary_df[COLOR_COL].unique():
-    sub = batch_summary_df[batch_summary_df[COLOR_COL] == color]
+compare["Delta_E_LAB_LINE"] = np.sqrt(
+    (compare["L_LINE"] - compare["L_LAB"])**2 +
+    (compare["a_LINE"] - compare["a_LAB"])**2 +
+    (compare["b_LINE"] - compare["b_LAB"])**2
+).round(2)
 
-    fig, ax = plt.subplots()
-    ax.plot(sub[BATCH_COL], sub[metric], marker="o")
-    ax.set_title(f"{metric} – 塗料編號 {color}")
+st.subheader("📋 LAB vs LINE Comparison Table")
+st.dataframe(compare, use_container_width=True)
+
+# =====================================================
+# COMPARISON CHART
+# =====================================================
+st.subheader("📈 LAB vs LINE Trend Chart")
+
+metric = st.selectbox("Select Metric", ["L", "a", "b"])
+
+for color in compare[COLOR_COL].unique():
+    sub = compare[compare[COLOR_COL] == color].sort_values(BATCH_COL)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    ax.plot(
+        sub[BATCH_COL],
+        sub[f"{metric}_LAB"],
+        marker="o",
+        linestyle="--",
+        label="LAB (IQC)"
+    )
+
+    ax.plot(
+        sub[BATCH_COL],
+        sub[f"{metric}_LINE"],
+        marker="s",
+        linestyle="-",
+        label="LINE (Production)"
+    )
+
+    ax.set_title(f"{metric} – LAB vs LINE | Color Code {color}")
     ax.set_xlabel("Batch")
     ax.set_ylabel(metric)
+    ax.legend()
     ax.grid(True)
 
     st.pyplot(fig)
 
-# =========================
-# Z-SCORE OUTLIER
-# =========================
-st.subheader("🚨 Batch lệch màu (Z-score > 2)")
+# =====================================================
+# EXPORT
+# =====================================================
+st.header("📤 Export Report")
 
-z_df = batch_summary_df.copy()
-
-for m in ["L_mean", "a_mean", "b_mean"]:
-    z_df[f"{m}_z"] = (z_df[m] - z_df[m].mean()) / z_df[m].std()
-
-out_df = z_df[
-    (z_df["L_mean_z"].abs() > 2) |
-    (z_df["a_mean_z"].abs() > 2) |
-    (z_df["b_mean_z"].abs() > 2)
-]
-
-if out_df.empty:
-    st.success("✅ Không có batch lệch màu bất thường")
-else:
-    st.warning("⚠️ Phát hiện batch lệch màu")
-    st.dataframe(
-        out_df[
-            [
-                COLOR_COL,
-                BATCH_COL,
-                "L_mean",
-                "a_mean",
-                "b_mean",
-                "coil_count"
-            ]
-        ],
-        use_container_width=True
-    )
-
-# =========================
-# EXPORT EXCEL
-st.subheader("📤 Xuất báo cáo (CSV)")
-
-csv = batch_summary_df.to_csv(index=False).encode("utf-8-sig")
+csv = compare.to_csv(index=False).encode("utf-8-sig")
 
 st.download_button(
-    label="⬇️ Download CSV Report",
-    data=csv,
-    file_name="Batch_LAB_Report.csv",
-    mime="text/csv"
+    "⬇️ Download LAB_vs_LINE_Report.csv",
+    csv,
+    "LAB_vs_LINE_Report.csv",
+    "text/csv"
 )
-
-
-
