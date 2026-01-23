@@ -290,7 +290,10 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
 
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
-    x_lab = lab["製造批號"]y_lab = lab["value"]LCL_lab, UCL_lab = lab_lim
+    x_lab = lab["製造批號"]
+y_lab = lab["value"]
+LCL_lab, UCL_lab = lab_lim
+
 
 if LCL_lab is not None and UCL_lab is not None:
     out_lab = (y_lab > UCL_lab) | (y_lab < LCL_lab)
@@ -486,6 +489,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
