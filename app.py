@@ -162,32 +162,18 @@ def get_limit(color, prefix, factor):
 def prep_spc(df, north, south):
     tmp = df.copy()
 
-    tmp[north] = pd.to_numeric(tmp[north], errors="coerce")
-    tmp[south] = pd.to_numeric(tmp[south], errors="coerce")
-
-    # LOẠI cuộn thiếu Bắc hoặc Nam
+    # CHỈ lấy cuộn có đủ 2 vị trí đo
     tmp = tmp.dropna(subset=[north, south])
 
-    # 1 cuộn = mean(Bắc, Nam)
-    tmp["coil_value"] = tmp[[north, south]].mean(axis=1)
+    # 1 cuộn = trung bình Bắc / Nam
+    tmp["value"] = tmp[[north, south]].mean(axis=1)
 
-    # ===== DEBUG (CHỈ XEM) =====
-    debug = tmp[tmp["製造批號"] == 18]
-    st.write("DEBUG – các cuộn được dùng để tính Δb batch 18")
-    st.dataframe(
-        debug[["製造批號", north, south, "coil_value"]]
-    )
-    # ==========================
-
-    # 1 batch = mean các cuộn
-    batch_df = (
-        tmp
-        .groupby("製造批號", as_index=False)["coil_value"]
-        .mean()
-        .rename(columns={"coil_value": "value"})
+    # 1 batch = 製造批號
+    return tmp.groupby("製造批號", as_index=False).agg(
+        Time=("Time", "min"),
+        value=("value", "mean")
     )
 
-    return batch_df
 
 def prep_lab(df, col):
     tmp = df.copy()
@@ -500,6 +486,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
