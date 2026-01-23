@@ -873,7 +873,7 @@ st.pyplot(fig2)
 
 # =========================
 import numpy as np
-from scipy.stats import norm
+import math
 
 st.subheader("📊 Average Thickness Distribution (Normal Curve + Spec)")
 
@@ -902,10 +902,16 @@ data = df_plot[thickness_col].dropna()
 mean = data.mean()
 std = data.std()
 
+# ---- NORMAL PDF (NO SCIPY) ----
+x = np.linspace(data.min(), data.max(), 200)
+y = (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
+    -0.5 * ((x - mean) / std) ** 2
+)
+
 # ---- PLOT ----
 fig, ax = plt.subplots(figsize=(10, 4))
 
-# Histogram (density=True để khớp với normal curve)
+# Histogram
 ax.hist(
     data,
     bins=20,
@@ -915,9 +921,6 @@ ax.hist(
 )
 
 # Normal curve
-x = np.linspace(data.min(), data.max(), 200)
-y = norm.pdf(x, mean, std)
-
 ax.plot(
     x,
     y,
@@ -925,7 +928,7 @@ ax.plot(
     label="Normal Distribution"
 )
 
-# Mean & Spec lines
+# Mean & Spec
 ax.axvline(mean, linestyle="--", linewidth=2,
            label=f"Mean = {mean:.2f}")
 
@@ -959,6 +962,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
