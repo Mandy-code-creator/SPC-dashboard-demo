@@ -449,6 +449,28 @@ for k in spc:
 # =========================
 # DISTRIBUTION DASHBOARD
 # =========================
+def calc_capability(values, lcl, ucl):
+    if lcl is None or ucl is None:
+        return None, None, None, None
+
+    mean = values.mean()
+    std = values.std()
+
+    if std == 0 or np.isnan(std):
+        return None, None, None, None
+
+    cp = (ucl - lcl) / (6 * std)
+    cpk = min(
+        (ucl - mean) / (3 * std),
+        (mean - lcl) / (3 * std)
+    )
+    ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
+
+    # Với dữ liệu batch → Ppk ≈ Cpk
+    ppk = cpk
+
+    return round(ca, 2), round(cp, 2), round(cpk, 2), round(ppk, 2)
+
 st.markdown("---")
 st.markdown("## 📈 Line Process Distribution Dashboard")
 
@@ -579,6 +601,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
