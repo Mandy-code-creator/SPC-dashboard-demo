@@ -17,14 +17,61 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Image
 from reportlab.lib.pagesizes import A4
 import io
-
-def export_pdf(image_paths):
+def fig_to_rl_image(fig, width_cm=16):
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4)
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    buf.seek(0)
 
+    img = Image(buf)
+    img.drawWidth = width_cm * cm
+    img.drawHeight = img.drawWidth * img.imageHeight / img.imageWidth
+    return img
+def export_pdf_report(color, year, summary_line_df, summary_lab_df, figs):
+    buf = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=2*cm,
+        leftMargin=2*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+
+    styles = getSampleStyleSheet()
     story = []
-    for p in image_paths:
-        story.append(Image(p, width=400, height=280))
+
+    # ===== TITLE =====
+    story.append(Paragraph(
+        f"<b>SPC COLOR REPORT</b><br/>Color: {color} | Year: {year}",
+        styles["Title"]
+    ))
+    story.append(Spacer(1, 12))
+
+    # ===== SUMMARY =====
+    story.append(Paragraph("<b>LINE SUMMARY</b>", styles["Heading2"]))
+    for _, r in summary_line_df.iterrows():
+        story.append(Paragraph(
+            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
+            styles["Normal"]
+        ))
+
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("<b>LAB SUMMARY</b>", styles["Heading2"]))
+    for _, r in summary_lab_df.iterrows():
+        story.append(Paragraph(
+            f"{r['Factor']} | Mean={r['Mean']} | Std={r['Std Dev']} | Min={r['Min']} | Max={r['Max']}",
+            styles["Normal"]
+        ))
+
+    # ===== CHARTS =====
+    story.append(PageBreak())
+    story.append(Paragraph("<b>CONTROL CHARTS</b>", styles["Heading2"]))
+    story.append(Spacer(1, 12))
+
+    for fig in figs:
+        story.append(fig_to_rl_image(fig))
+        story.append(Spacer(1, 16))
 
     doc.build(story)
     buf.seek(0)
@@ -372,8 +419,17 @@ pdf_buf = export_pdf_report(
     color,
     year,
     summary_line_df,
-    summary_lab_df
+    summary_lab_df,
+    pdf_images
 )
+
+st.download_button(
+    "⬇ Download SPC Audit PDF",
+    data=pdf_buf,
+    file_name=f"SPC_Report_{color}_{year}.pdf",
+    mime="application/pdf"
+)
+
 
 st.download_button(
     "⬇ Download SPC Audit PDF",
@@ -491,6 +547,8 @@ def download(fig, name):
 # =========================
 # DASHBOARD
 # =========================
+pdf_figs = []
+
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
 for k in spc:
     fig = spc_combined(
@@ -501,7 +559,10 @@ for k in spc:
         get_limit(color, k, "LINE")
     )
     st.pyplot(fig)
-    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
+
+    pdf_figs.append(fig)   # 👈 DÒNG QUAN TRỌNG
+
 
 # === SAVE FIG FOR PDF ===
 import os
@@ -858,6 +919,7 @@ st.download_button(
     file_name="SPC_Distribution_Report.pdf",
     mime="application/pdf"
 )
+
 
 
 
