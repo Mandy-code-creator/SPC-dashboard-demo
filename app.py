@@ -757,42 +757,33 @@ else:
 
 # ======================================================
 # ======================================================
-# 📏 CROSS-WEB THICKNESS SPC – LINE ONLY (SPC-SOURCE SAFE)
+# 📏 CROSS-WEB THICKNESS SPC & COLOR RELATION (LINE ONLY)
 # ======================================================
 
 st.markdown("---")
-st.markdown("## 📏 Cross-Web Thickness SPC (LINE)")
+st.markdown("## 📏 Cross-Web Thickness & Color SPC (LINE)")
+st.caption(
+    "Analyze coating thickness variation and its impact on color deviation (LINE only)"
+)
 
 # =========================
-# GET LINE SOURCE FROM SPC
+# SOURCE DATA (USE df)
 # =========================
-try:
-    # Lấy danh sách batch LINE đã dùng cho SPC
-    batch_series = spc[next(iter(spc))]["line"]["製造批號"]
-except Exception:
-    st.error("❌ Cannot access LINE SPC source data")
-    st.stop()
-
-# =========================
-# REBUILD LINE DATA FROM RAW DF
-# =========================
-# ⚠️ df_raw là dataframe gốc đọc từ Google Sheet (bạn CHẮC CHẮN có)
-# Thay df_raw bằng đúng tên dataframe gốc của bạn nếu khác
-if "df_raw" not in globals():
-    st.error("❌ Raw dataframe (df_raw) not found")
-    st.stop()
-
-source_df = df_raw[df_raw["製造批號"].isin(batch_series)].copy()
+source_df = df.copy()
 
 required_cols = [
     "製造批號",
     "Avergage Thickness (µm)正面",
     "Coating Thickness 正面 - 北",
     "Coating Thickness 正面 - 南",
+    "正-北 ΔL", "正-南 ΔL",
+    "正-北 Δa", "正-南 Δa",
+    "正-北 Δb", "正-南 Δb",
 ]
 
-if not all(c in source_df.columns for c in required_cols):
-    st.error("❌ Missing thickness columns in raw data")
+missing = [c for c in required_cols if c not in source_df.columns]
+if missing:
+    st.error(f"❌ Missing columns: {missing}")
     st.stop()
 
 # =========================
@@ -801,59 +792,28 @@ if not all(c in source_df.columns for c in required_cols):
 cd_df = source_df.dropna(subset=required_cols).copy()
 
 cd_df["CD Avg Thickness"] = cd_df["Avergage Thickness (µm)正面"]
-cd_df["CD Thickness Diff (北-南)"] = (
+cd_df["CD Thickness Diff"] = (
     cd_df["Coating Thickness 正面 - 北"]
     - cd_df["Coating Thickness 正面 - 南"]
 )
-cd_df["CD Thickness Uniformity"] = cd_df["CD Thickness Diff (北-南)"].abs()
+cd_df["CD Uniformity"] = cd_df["CD Thickness Diff"].abs()
+
+# LINE color deviation (avg North/South)
+cd_df["ΔL_LINE"] = cd_df[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+cd_df["Δa_LINE"] = cd_df[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+cd_df["Δb_LINE"] = cd_df[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
 
 # =========================
-# SPC PLOT FUNCTION
+# SPC FUNCTION
 # =========================
-def plot_spc(df, value_col, title, target=None):
+def plot_spc(df, value_col, title, target=None, ylabel="µm"):
     mean = df[value_col].mean()
     std = df[value_col].std()
 
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.plot(df["製造批號"], df[value_col], "o-", linewidth=2)
 
-    ax.axhline(mean, linestyle=":", linewidth=2, label="Mean")
-
-    if target is not None:
-        ax.axhline(target, linestyle="--", linewidth=2, label=f"Target {target}")
-
-    if std > 0:
-        ucl = mean + 3 * std
-        lcl = mean - 3 * std
-        ax.axhline(ucl, linestyle="--", label="+3σ")
-        ax.axhline(lcl, linestyle="--", label="-3σ")
-
-        ooc = (df[value_col] > ucl) | (df[value_col] < lcl)
-        ax.scatter(
-            df.loc[ooc, "製造批號"],
-            df.loc[ooc, value_col],
-            s=90,
-            zorder=5,
-            label="OOC"
-        )
-
-    ax.set_title(title)
-    ax.set_ylabel("µm")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    fig.subplots_adjust(right=0.78)
-
-    st.pyplot(fig)
-
-# =========================
-# RENDER SPC
-# =========================
-plot_spc(cd_df, "CD Avg Thickness", "CD Average Thickness (Target = 25 µm)", target=25)
-plot_spc(cd_df, "CD Thickness Diff (北-南)", "CD Thickness Difference (North - South)", target=0)
-plot_spc(cd_df, "CD Thickness Uniformity", "CD Thickness Uniformity |North - South|")
-
-
+    ax.axhline(mean, linestyle=":", linewidth=2, label="Me
 
 
 
