@@ -252,7 +252,7 @@ st.markdown(
 
 # ======================================================
 # ======================================================
-# 📋 SPC SUMMARY TABLE (LAB & LINE)
+# 📋 SUMMARY TABLE (LAB & LINE)
 # ======================================================
 summary_line = []
 summary_lab = []
@@ -407,7 +407,7 @@ def download(fig, name):
 # =========================
 # DASHBOARD
 # =========================
-st.markdown("### 📊 COMBINED SPC")
+st.markdown("### 📊 CONTROL CHART: LAB-LINE")
 for k in spc:
     fig = spc_combined(
         spc[k]["lab"],
@@ -640,6 +640,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
