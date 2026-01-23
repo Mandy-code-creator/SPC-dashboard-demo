@@ -448,6 +448,7 @@ for k in spc:
 
 # =========================
 # =========================
+# =========================
 # DISTRIBUTION DASHBOARD
 # =========================
 
@@ -468,7 +469,18 @@ def calc_capability(values, lcl, ucl):
     )
     ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
 
-   
+    # Short-term batch data
+    ppk = cpk
+
+    return round(ca, 2), round(cp, 2), round(cpk, 2), round(ppk, 2)
+
+
+def normal_pdf(x, mean, std):
+    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
+        -0.5 * ((x - mean) / std) ** 2
+    )
+
+
 # =========================
 # LINE PROCESS DISTRIBUTION
 # =========================
@@ -633,6 +645,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
