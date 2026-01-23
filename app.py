@@ -165,6 +165,38 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} LCL", [None]).values[0],
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
+# =========================
+# OUT-OF-CONTROL DETECTION
+# =========================
+def detect_out_of_control(spc_df, lcl, ucl):
+    """
+    spc_df: DataFrame có cột ['製造批號', 'value']
+    """
+    mean = spc_df["value"].mean()
+    std = spc_df["value"].std()
+
+    result = spc_df.copy()
+
+    result["Rule_CL"] = False
+    result["Rule_3Sigma"] = False
+
+    if lcl is not None and ucl is not None:
+        result["Rule_CL"] = (
+            (result["value"] < lcl) |
+            (result["value"] > ucl)
+        )
+
+    if std > 0:
+        result["Rule_3Sigma"] = (
+            (result["value"] > mean + 3 * std) |
+            (result["value"] < mean - 3 * std)
+        )
+
+    result["Out_of_Control"] = (
+        result["Rule_CL"] | result["Rule_3Sigma"]
+    )
+
+    return result[result["Out_of_Control"]]
 
 # =========================
 # PREP SPC DATA
@@ -563,6 +595,7 @@ if ooc_rows:
     st.dataframe(ooc_df, use_container_width=True)
 else:
     st.success("✅ No out-of-control batches detected")
+
 
 
 
