@@ -588,7 +588,7 @@ st.download_button(
 
 download(fig, f"COMBINED_{color}_{k}.png")
 
-    pdf_figs.append(fig)   # 👈 DÒNG QUAN TRỌNG
+pdf_figs.append(fig)   # 👈 DÒNG QUAN TRỌNG
 
 
 # === SAVE FIG FOR PDF ===
@@ -946,6 +946,7 @@ st.download_button(
     file_name="SPC_Distribution_Report.pdf",
     mime="application/pdf"
 )
+
 
 
 
