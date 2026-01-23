@@ -771,14 +771,14 @@ st.header("🎨 Thickness – Color Analysis (Per Coil)")
 # =========================
 # COLUMN NAMES (FIX CỨNG)
 # =========================
-coil_col = "Coil No"
+coil_col = "Coil No."
 time_col = "Time"
 
 thickness_col = "Avergage Thickness"
 
 dE_col = "Average value ΔE 正面"
 dL_col = "Average value ΔL 正面"
-da_col = "Average value  Δa 正面"
+da_col = "Average value Δa 正面"
 db_col = "Average value Δb 正面"
 
 required_cols = [
@@ -887,6 +887,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
