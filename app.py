@@ -299,28 +299,63 @@ with col2:
 def spc_combined(lab, line, title, lab_lim, line_lim):
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    mean = line["value"].mean()
-    std = line["value"].std()
+    # ===== LAB =====
+    lab_ok = lab[~lab["OOC"]]
+    lab_bad = lab[lab["OOC"]]
 
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+    ax.plot(
+        lab_ok["製造批號"],
+        lab_ok["value"],
+        "o-",
+        label="LAB",
+        color="#1f77b4"
+    )
 
-    ax.axhline(mean + 3 * std, color="orange", linestyle="--", label="+3σ")
-    ax.axhline(mean - 3 * std, color="orange", linestyle="--", label="-3σ")
+    ax.scatter(
+        lab_bad["製造批號"],
+        lab_bad["value"],
+        color="red",
+        s=90,
+        label="LAB OOC",
+        zorder=5
+    )
 
+    # ===== LINE =====
+    line_ok = line[~line["OOC"]]
+    line_bad = line[line["OOC"]]
+
+    ax.plot(
+        line_ok["製造批號"],
+        line_ok["value"],
+        "o-",
+        label="LINE",
+        color="#2ca02c"
+    )
+
+    ax.scatter(
+        line_bad["製造批號"],
+        line_bad["value"],
+        color="red",
+        s=90,
+        label="LINE OOC",
+        zorder=5
+    )
+
+    # ===== LIMIT =====
     if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":")
 
     if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
+        ax.axhline(line_lim[0], color="red")
+        ax.axhline(line_lim[1], color="red")
 
     ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True)
     ax.tick_params(axis="x", rotation=45)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
     fig.subplots_adjust(right=0.78)
+
     return fig
 
 
@@ -494,6 +529,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
