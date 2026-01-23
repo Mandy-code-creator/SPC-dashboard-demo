@@ -85,6 +85,62 @@ df.columns = (
 )
 
 st.success("✅ Data loaded successfully")
+# SIDEBAR – FILTER
+# =========================
+st.sidebar.title("🎨 Filter")
+
+color = st.sidebar.selectbox(
+    "Color code",
+    sorted(df["塗料編號"].dropna().unique())
+)
+
+df = df[df["塗料編號"] == color]
+
+latest_year = df["Time"].dt.year.max()
+year = st.sidebar.selectbox(
+    "Year",
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+)
+
+month = st.sidebar.multiselect(
+    "Month (optional)",
+    sorted(df["Time"].dt.month.unique())
+)
+
+df = df[df["Time"].dt.year == year]
+if month:
+    df = df[df["Time"].dt.month.isin(month)]
+
+st.sidebar.divider()
+
+# =========================
+# LIMIT DISPLAY
+# =========================
+def show_limits(factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return
+    table = row.filter(like=factor).copy()
+    for c in table.columns:
+        table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+    st.sidebar.markdown(f"**{factor} Control Limits**")
+    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
+
+show_limits("LAB")
+show_limits("LINE")
+
+# =========================
+# LIMIT FUNCTION
+# =========================
+def get_limit(color, prefix, factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None, None
+    return (
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
+    )
 
 # =========================
 # SIDEBAR FILTER
@@ -247,3 +303,4 @@ st.download_button(
     "LAB_vs_LINE_Report.csv",
     "text/csv"
 )
+
