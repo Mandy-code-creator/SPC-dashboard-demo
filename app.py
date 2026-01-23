@@ -902,6 +902,55 @@ else:
     ax_t.grid(True, linestyle="--", alpha=0.4)
 
     st.pyplot(fig_t)
+# =========================
+# THICKNESS DISTRIBUTION WITH LIMITS
+# =========================
+st.subheader("📊 Average Thickness Distribution (with LSL / USL)")
+
+# ---- USER INPUT SPEC ----
+col_l, col_u = st.columns(2)
+
+with col_l:
+    LSL = st.number_input(
+        "LSL (Lower Spec Limit)",
+        value=float(df_plot[thickness_col].mean() - 1.0)
+    )
+
+with col_u:
+    USL = st.number_input(
+        "USL (Upper Spec Limit)",
+        value=float(df_plot[thickness_col].mean() + 1.0)
+    )
+
+if LSL >= USL:
+    st.error("❌ LSL must be smaller than USL")
+else:
+    fig_t, ax_t = plt.subplots(figsize=(10, 4))
+
+    data = df_plot[thickness_col].dropna()
+
+    # Histogram
+    ax_t.hist(data, bins=20, alpha=0.7)
+
+    # Mean
+    mean_thk = data.mean()
+    ax_t.axvline(mean_thk, linestyle="--", linewidth=2,
+                 label=f"Mean = {mean_thk:.2f}")
+
+    # Spec limits
+    ax_t.axvline(LSL, linestyle="-", linewidth=2, label="LSL")
+    ax_t.axvline(USL, linestyle="-", linewidth=2, label="USL")
+
+    # Normal zone shading
+    ax_t.axvspan(LSL, USL, alpha=0.15, label="Normal Zone")
+
+    ax_t.set_xlabel("Average Thickness")
+    ax_t.set_ylabel("Number of Coils")
+    ax_t.set_title("Thickness Distribution per Coil")
+    ax_t.legend()
+    ax_t.grid(True, linestyle="--", alpha=0.4)
+
+    st.pyplot(fig_t)
 
 # =========================
 # DATA TABLE
@@ -919,6 +968,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
