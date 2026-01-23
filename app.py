@@ -159,6 +159,14 @@ def get_limit(color, prefix, factor):
 # =========================
 # PREP SPC DATA
 # =========================
+# DEBUG chỉ cho mã màu + batch bạn đang kiểm
+debug = tmp[tmp["製造批號"] == 18]
+
+st.write("DEBUG – các cuộn được dùng để tính Δb batch 18")
+st.dataframe(
+    debug[["製造批號", north, south, "coil_value"]]
+)
+
 def prep_spc(df, north, south):
     tmp = df.copy()
 
@@ -494,6 +502,7 @@ for i, k in enumerate(spc):
         ax.grid(axis="y", alpha=0.3)
 
         st.pyplot(fig)
+
 
 
 
