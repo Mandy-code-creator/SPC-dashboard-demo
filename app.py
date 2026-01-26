@@ -187,7 +187,6 @@ st.sidebar.divider()
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
 if control_batch is not None and not df.empty:
@@ -199,9 +198,9 @@ if control_batch is not None and not df.empty:
           .first()
           .reset_index(drop=True)
     )
-    
+
     # Tạo Batch# (BẮT ĐẦU TỪ 1 – KHÔNG BAO GIỜ LÀ 0)
-batch_order["Batch#"] = batch_order.index + 1
+    batch_order["Batch#"] = batch_order.index + 1
 
     # Gắn Batch# vào df gốc
     df = df.merge(
@@ -209,8 +208,8 @@ batch_order["Batch#"] = batch_order.index + 1
         on="製造批號",
         how="left"
     )
-
-
+st.write("DEBUG Batch order")
+st.write(batch_order.head(10))
     # ===== GET CONTROL BATCH CODE BY Batch# =====
     row_cb = batch_order[batch_order["Batch#"] == control_batch]
 
@@ -1128,6 +1127,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
