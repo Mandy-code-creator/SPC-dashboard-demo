@@ -108,42 +108,6 @@ df.columns = (
     .str.strip()
 )
 
-limit_df.columns = (
-    limit_df.columns
-    .str.replace("\r\n", " ", regex=False)
-    .str.replace("\n", " ", regex=False)
-    .str.replace("　", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-    .str.strip()
-)
-
-# =========================
-# FUNCTIONS
-# =========================
-def get_limit(color, prefix, factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None, None
-    return (
-        row.get(f"{factor} {prefix} LCL", [None]).values[0],
-        row.get(f"{factor} {prefix} UCL", [None]).values[0]
-    )
-
-def get_control_batch(color):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None
-
-    value = row["Control_batch"].values[0]
-
-    if pd.isna(value):
-        return None
-
-    try:
-        return int(float(value))
-    except:
-        return None
-
 # =========================
 # SIDEBAR – FILTER
 # =========================
@@ -154,58 +118,28 @@ color = st.sidebar.selectbox(
     sorted(df["塗料編號"].dropna().unique())
 )
 
-# filter theo màu
-df_color = df[df["塗料編號"] == color].copy()
+df = df[df["塗料編號"] == color]
 
-latest_year = df_color["Time"].dt.year.max()
+latest_year = df["Time"].dt.year.max()
 year = st.sidebar.selectbox(
     "Year",
-    sorted(df_color["Time"].dt.year.unique()),
-    index=list(sorted(df_color["Time"].dt.year.unique())).index(latest_year)
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
 )
 
 month = st.sidebar.multiselect(
     "Month (optional)",
-    sorted(df_color["Time"].dt.month.unique())
+    sorted(df["Time"].dt.month.unique())
 )
 
-df_color = df_color[df_color["Time"].dt.year == year]
+df = df[df["Time"].dt.year == year]
 if month:
-    df_color = df_color[df_color["Time"].dt.month.isin(month)]
-
-# =========================
-# CONTROL BATCH INFO (SIDEBAR)
-# =========================
-control_batch = get_control_batch(color)
-
-if control_batch is not None:
-    batch_order = (
-        df_color.sort_values("Time")
-        .groupby("製造批號", as_index=False)
-        .first()
-        .reset_index(drop=True)
-    )
-
-    if len(batch_order) == 0:
-        st.sidebar.warning("⚠ Không có batch sau khi filter")
-    elif control_batch <= len(batch_order):
-        control_batch_code = batch_order.loc[
-            control_batch - 1, "製造批號"
-        ]
-
-        st.sidebar.info(
-            f"🔔 Control from batch\n\n"
-            f"Batch #{control_batch} → **{control_batch_code}**"
-        )
-    else:
-        st.sidebar.warning(
-            f"⚠ Control batch #{control_batch} > số batch hiện có ({len(batch_order)})"
-        )
+    df = df[df["Time"].dt.month.isin(month)]
 
 st.sidebar.divider()
 
 # =========================
-# LIMIT DISPLAY (OPTIONAL)
+# LIMIT DISPLAY
 # =========================
 def show_limits(factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -215,17 +149,23 @@ def show_limits(factor):
     for c in table.columns:
         table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
     st.sidebar.markdown(f"**{factor} Control Limits**")
-    st.sidebar.dataframe(
-        table,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
 
 show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-
+# LIMIT FUNCTION
+# =========================
+def get_limit(color, prefix, factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None, None
+    return (
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
+    )
+# =========================
 # OUT-OF-CONTROL DETECTION
 # =========================
 def detect_out_of_control(spc_df, lcl, ucl):
@@ -826,7 +766,7 @@ else:
 # CROSS-COIL THICKNESS – COLOR ANALYSIS (BOTTOM)
 # ============================================================
 st.markdown("---")
-st.header("🎨 LINE-Thickness – Color Analysis (Per Coil)")
+st.header("🎨 Thickness – Color Analysis (Per Coil)")
 
 # =========================
 # COLUMN NAMES (FIX CỨNG)
@@ -916,7 +856,6 @@ ax.grid(True, linestyle="--", alpha=0.4)
 
 st.pyplot(fig)
 
-# =========================
 # =========================
 # ΔE DISTRIBUTION
 # =========================
@@ -1079,21 +1018,6 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
