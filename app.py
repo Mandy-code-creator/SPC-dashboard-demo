@@ -237,7 +237,7 @@ if control_batch is not None and "Batch#" in df.columns:
 
     st.subheader("📊 Before / After Control Summary")
     st.dataframe(summary_df, use_container_width=True)
-
+st.write("DEBUG df_before columns:", df_before.columns)
     # ===== CONTROL BATCH ROW =====
     row_cb = batch_order[batch_order["Batch#"] == control_batch]
 
@@ -1163,6 +1163,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
