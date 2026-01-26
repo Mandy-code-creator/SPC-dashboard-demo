@@ -430,29 +430,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
             va="top"
         )
 
-def spc_combined_phase2(
-    lab, line, title, lab_lim, line_lim, control_batch_code
-):
-    if control_batch_code is None:
-        return None
-
-    lab2 = lab[lab["製造批號"] >= control_batch_code]
-    line2 = line[line["製造批號"] >= control_batch_code]
-
-    if lab2.empty or line2.empty:
-        return None
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    # ===== LAB + LINE =====
-    ax.plot(
-        lab2["製造批號"], lab2["value"],
-        "o-", label="LAB (Phase II)", color="#1f77b4"
-    )
-    ax.plot(
-        line2["製造批號"], line2["value"],
-        "o-", label="LINE (Phase II)", color="#2ca02c"
-    )
 
     # ===== CONTROL LIMITS (GIỮ NGUYÊN LOGIC) =====
     if lab_lim[0] is not None:
@@ -566,26 +543,6 @@ for k in spc:
     download(fig, f"COMBINED_{color}_{k}.png")
 
 # =========================
-# SPC CHARTS – PHASE II (NEW)
-# =========================
-st.markdown("### 📊 CONTROL CHART: LAB-LINE (Phase II)")
-
-for k in spc:
-    fig2 = spc_combined_phase2(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k} (Phase II)",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE"),
-        control_batch_code
-    )
-
-    if fig2 is not None:
-        st.pyplot(fig2)
-        download(fig2, f"COMBINED_PHASE2_{color}_{k}.png")
-    else:
-        st.info(f"{k}: Phase II data not available")
-
 
 # =========================
 # =========================
@@ -1186,6 +1143,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
