@@ -495,7 +495,7 @@ def spc_single(spc, title, limit, color):
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
 
-    return fig
+
 
 
 def download(fig, name):
@@ -580,9 +580,7 @@ def spc_combined_phase2(lab_df, line_df, title, lab_lim, line_lim):
     ax.set_ylabel("Value")
     ax.legend()
     ax.grid(True)
-
-    return fig
-
+    
     # ===== control limits (GIỐNG Y HỆT BIỂU ĐỒ CŨ) =====
     if lab_lim[0] is not None:
         ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
@@ -1258,6 +1256,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
