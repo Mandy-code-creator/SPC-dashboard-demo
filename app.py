@@ -119,9 +119,21 @@ def get_limit(color, prefix, factor):
     )
 def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
+
     if row.empty:
         return None
-    return int(row["Control_batch"].values[0])
+
+    value = row["Control_batch"].values[0]
+
+    # nếu trống / NaN
+    if pd.isna(value):
+        return None
+
+    try:
+        return int(float(value))
+    except ValueError:
+        return None
+
 
 # =========================
 # =========================
@@ -1052,6 +1064,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
