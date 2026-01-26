@@ -111,6 +111,7 @@ df.columns = (
     .str.strip()
 )
 # =========================
+# =========================
 # LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
@@ -122,7 +123,10 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
 
-# CONTROL BATCH FUNCTION  
+
+# =========================
+# CONTROL BATCH FUNCTION
+# =========================
 def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
 
@@ -141,7 +145,7 @@ def get_control_batch(color):
         if m:
             return int(m.group())
 
-    # số thuần
+    # numeric
     try:
         return int(float(value))
     except:
@@ -177,10 +181,8 @@ if month:
     df = df[df["Time"].dt.month.isin(month)]
 
 st.sidebar.divider()
-# =========================
 
-# =========================
-# =========================
+
 # =========================
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
@@ -190,6 +192,7 @@ st.sidebar.write("DEBUG Control_batch =", control_batch)
 
 if control_batch is not None and not df.empty:
 
+    # ===== CREATE BATCH ORDER (START FROM 1) =====
     batch_order = (
         df.sort_values("Time")
           .groupby("製造批號", as_index=False)
@@ -197,10 +200,14 @@ if control_batch is not None and not df.empty:
           .reset_index(drop=True)
     )
 
-    if 1 <= control_batch <= len(batch_order):
-        control_batch_code = batch_order.loc[
-            control_batch - 1, "製造批號"
-        ]
+    # ⭐ QUAN TRỌNG: Batch# BẮT ĐẦU TỪ 1
+    batch_order["Batch#"] = batch_order.index + 1
+
+    # ===== GET CONTROL BATCH CODE BY Batch# =====
+    row_cb = batch_order[batch_order["Batch#"] == control_batch]
+
+    if not row_cb.empty:
+        control_batch_code = row_cb["製造批號"].values[0]
 
         st.sidebar.info(
             f"🔔 **Control batch**\n\n"
@@ -212,6 +219,7 @@ if control_batch is not None and not df.empty:
         )
 
 st.sidebar.divider()
+
 
 # =========================
 # LIMIT DISPLAY
@@ -1104,6 +1112,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
