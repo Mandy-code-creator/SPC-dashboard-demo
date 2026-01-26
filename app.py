@@ -406,33 +406,56 @@ with col2:
 # SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
+    """
+    Combined SPC chart (LAB + LINE)
+    ⚠️ Phase / control batch KHÔNG xử lý trong hàm này
+    """
+
+    # ===== SAFETY CHECK =====
+    if lab is None or line is None:
+        return None
+    if lab.empty or line.empty:
+        return None
 
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    mean = line["value"].mean()
-    std = line["value"].std()
+    # ===== DATA =====
+    ax.plot(
+        lab["製造批號"],
+        lab["value"],
+        "o-",
+        label="LAB",
+        color="#1f77b4"
+    )
 
-    # ===== original lines (GIỮ NGUYÊN) =====
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
-     # ===== Phase change (Minitab style) =====
-    if control_batch_code is not None:
-        ax.axvline(
-            x=control_batch_code,
-            color="#b22222",
-            linestyle="--",
-            linewidth=1.5
-        )
+    ax.plot(
+        line["製造批號"],
+        line["value"],
+        "o-",
+        label="LINE",
+        color="#2ca02c"
+    )
 
-        ax.text(
-            control_batch_code,
-            ax.get_ylim()[1] * 0.97,
-            "Phase II",
-            color="#b22222",
-            fontsize=9,
-            ha="center",
-            va="top"
-        )
+    # ===== CONTROL LIMITS =====
+    LCL_lab, UCL_lab = lab_lim
+    if LCL_lab is not None and UCL_lab is not None:
+        ax.axhline(LCL_lab, color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(UCL_lab, color="#1f77b4", linestyle=":", label="LAB UCL")
+
+    LCL_line, UCL_line = line_lim
+    if LCL_line is not None and UCL_line is not None:
+        ax.axhline(LCL_line, color="red", linestyle="-", label="LINE LCL")
+        ax.axhline(UCL_line, color="red", linestyle="-", label="LINE UCL")
+
+    # ===== TITLE / STYLE =====
+    ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+
+    fig.subplots_adjust(right=0.78)
+
+    return fig
 
 def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
 
@@ -1207,6 +1230,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
