@@ -430,6 +430,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
             va="top"
         )
 
+
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
     y_lab = lab["value"]
@@ -464,6 +465,56 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
 
+    return fig
+# =========================phase 2 chart
+    def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
+
+    if control_batch_code is None:
+        return None
+
+    # ===== chỉ lấy Phase II =====
+    lab2 = lab[lab["製造批號"] >= control_batch_code]
+    line2 = line[line["製造批號"] >= control_batch_code]
+
+    if lab2.empty and line2.empty:
+        return None
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    # ===== LAB & LINE =====
+    if not lab2.empty:
+        ax.plot(lab2["製造批號"], lab2["value"], "o-", label="LAB", color="#1f77b4")
+
+    if not line2.empty:
+        ax.plot(line2["製造批號"], line2["value"], "o-", label="LINE", color="#2ca02c")
+
+    # ===== Phase II marker =====
+    ax.axvline(
+        x=control_batch_code,
+        color="#b22222",
+        linestyle="--",
+        linewidth=1.5,
+        label="Phase II start"
+    )
+
+    # ===== control limits (GIỐNG Y HỆT BIỂU ĐỒ CŨ) =====
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red", label="LINE LCL")
+        ax.axhline(line_lim[1], color="red", label="LINE UCL")
+
+    ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    fig.subplots_adjust(right=0.78)
+
+    return fig
+# =========================
+
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
@@ -495,7 +546,7 @@ def spc_single(spc, title, limit, color):
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
 
-
+    return fig
 
 
 def download(fig, name):
@@ -511,94 +562,16 @@ def download(fig, name):
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
 for k in spc:
     fig = spc_combined(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k}",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE"),
-        control_batch_code
-    )
-
-    if fig is not None:
-        st.pyplot(fig)
-        download(fig, f"COMBINED_{color}_{k}.png")
-    else:
-        st.info(f"{k}: Combined chart cannot be generated")
-# ========================= phase 2
-def spc_combined_phase2(lab_df, line_df, title, lab_lim, line_lim):
-    # ===== PHASE II ONLY =====
-    lab_df = lab_df[lab_df["Phase"] == "Phase II"]
-    line_df = line_df[line_df["Phase"] == "Phase II"]
-
-    if lab_df.empty or line_df.empty:
-        return None
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-
-    # ===== LAB =====
-    ax.plot(
-        lab_df["Batch#"],
-        lab_df["Value"],
-        marker="o",
-        label="LAB",
-        color="tab:blue"
-    )
-
-    # Out of control → đỏ
-    ooc_lab = (lab_df["Value"] > lab_lim["UCL"]) | (lab_df["Value"] < lab_lim["LCL"])
-    ax.scatter(
-        lab_df.loc[ooc_lab, "Batch#"],
-        lab_df.loc[ooc_lab, "Value"],
-        color="red",
-        zorder=5
-    )
-
-    # ===== LINE =====
-    ax.plot(
-        line_df["Batch#"],
-        line_df["Value"],
-        marker="s",
-        label="LINE",
-        color="tab:orange"
-    )
-
-    ooc_line = (line_df["Value"] > line_lim["UCL"]) | (line_df["Value"] < line_lim["LCL"])
-    ax.scatter(
-        line_df.loc[ooc_line, "Batch#"],
-        line_df.loc[ooc_line, "Value"],
-        color="red",
-        zorder=5
-    )
-
-    # ===== LIMITS (GIỐNG BIỂU ĐỒ CŨ) =====
-    ax.axhline(lab_lim["UCL"], color="red", linestyle="--")
-    ax.axhline(lab_lim["LCL"], color="red", linestyle="--")
-    ax.axhline(lab_lim["CL"], color="green", linestyle="-")
-
-    ax.set_title(title)
-    ax.set_xlabel("Batch#")
-    ax.set_ylabel("Value")
-    ax.legend()
-    ax.grid(True)
-    
-    # ===== control limits (GIỐNG Y HỆT BIỂU ĐỒ CŨ) =====
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-
-    return fig
-
-# =========================
+    spc[k]["lab"],
+    spc[k]["line"],
+    f"COMBINED {k}",
+    get_limit(color, k, "LAB"),
+    get_limit(color, k, "LINE"),
+    control_batch_code
+)
+    st.pyplot(fig)
+    download(fig, f"COMBINED_{color}_{k}.png")
+#SPC Combined Chart (LAB + LINE) – Phase II")
 st.markdown("---")
 st.subheader("📊 SPC Combined Chart (LAB + LINE) – Phase II")
 
@@ -619,44 +592,8 @@ for k in ["ΔL", "Δa", "Δb"]:
     else:
         st.info(f"{k}: Not enough Phase II data")
 
+
 # =========================
-st.markdown("---")
-st.subheader("📊 SPC Combined Chart (LAB + LINE) – Phase II")
-
-for k in ["ΔL", "Δa", "Δb"]:
-
-    lab_df = df[(df["項目"] == k) & (df["Source"] == "LAB")]
-    line_df = df[(df["項目"] == k) & (df["Source"] == "LINE")]
-
-    fig = spc_combined_phase2(
-        lab_df=lab_df,
-        line_df=line_df,
-        title=f"{k} – LAB + LINE (Phase II)",
-        lab_lim=lab_limits[k],
-        line_lim=line_limits[k]
-    )
-
-    if fig is not None:
-        st.pyplot(fig)
-        download(fig, f"COMBINED_{color}_{k}.png")
-    else:
-        st.info(f"{k}: Combined chart cannot be generated")
-
-    # ===== TỪ ĐÂY TRỞ XUỐNG: GIỮ NGUYÊN CODE VẼ CŨ =====
-    fig, ax = plt.subplots(figsize=(10, 4))
-
-    ax.plot(lab2["Batch#"], lab2["Value"], marker="o", label="LAB")
-    ax.plot(line2["Batch#"], line2["Value"], marker="s", label="LINE")
-
-    ax.axhline(lab_lim["UCL"], color="red", linestyle="--")
-    ax.axhline(lab_lim["LCL"], color="red", linestyle="--")
-    ax.axhline(lab_lim["CL"], color="black")
-
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True)
-
- 
 # =========================
 # =========================
 # DISTRIBUTION DASHBOARD
@@ -1255,18 +1192,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
