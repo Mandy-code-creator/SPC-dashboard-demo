@@ -527,29 +527,35 @@ for k in spc:
 # =========================
 # SPC PHASE II (SEPARATE CHART)
 # =========================
+# SPC PHASE II (SEPARATE CHART)
+# =========================
 st.markdown("## 📊 SPC Phase II (Monitoring)")
 
 if control_batch is not None:
 
     for k in spc:
 
-        df_lab = spc[k]["lab"]
-        df_line = spc[k]["line"]
+        df_lab = spc[k]["lab"].reset_index(drop=True)
+        df_line = spc[k]["line"].reset_index(drop=True)
 
-        # ===== chỉ lấy batch >= control_batch =====
+        # ===== TẠO Batch# TẠM (BẮT ĐẦU TỪ 1) =====
+        df_lab["Batch#"] = df_lab.index + 1
+        df_line["Batch#"] = df_line.index + 1
+
+        # ===== LẤY PHASE II =====
         lab_p2 = df_lab[df_lab["Batch#"] >= control_batch]
         line_p2 = df_line[df_line["Batch#"] >= control_batch]
 
         if lab_p2.empty and line_p2.empty:
             continue
 
-        # ===== giới hạn gốc từ Google Sheet =====
+        # ===== GIỚI HẠN GỐC (GOOGLE SHEET) =====
         lab_lim = get_limit(color, k, "LAB")
         line_lim = get_limit(color, k, "LINE")
 
         fig, ax = plt.subplots(figsize=(12, 4))
 
-        # ===== LAB =====
+        # LAB
         if not lab_p2.empty:
             ax.plot(
                 lab_p2["Batch#"],
@@ -558,7 +564,7 @@ if control_batch is not None:
                 label="LAB"
             )
 
-        # ===== LINE =====
+        # LINE
         if not line_p2.empty:
             ax.plot(
                 line_p2["Batch#"],
@@ -567,7 +573,7 @@ if control_batch is not None:
                 label="LINE"
             )
 
-        # ===== giới hạn kiểm soát (GIỮ NGUYÊN) =====
+        # ===== GIỚI HẠN KIỂM SOÁT (GIỮ NGUYÊN) =====
         if lab_lim:
             ax.axhline(lab_lim["UCL"], linestyle="-", linewidth=1)
             ax.axhline(lab_lim["LCL"], linestyle="-", linewidth=1)
@@ -577,7 +583,7 @@ if control_batch is not None:
             ax.axhline(line_lim["UCL"], linestyle="--", linewidth=1)
             ax.axhline(line_lim["LCL"], linestyle="--", linewidth=1)
 
-        # ===== nhãn Phase II (kiểu Minitab) =====
+        # ===== NHÃN PHASE II (KIỂU MINITAB) =====
         ax.text(
             control_batch,
             ax.get_ylim()[1],
@@ -594,8 +600,6 @@ if control_batch is not None:
         ax.grid(alpha=0.3)
 
         st.pyplot(fig)
-
-
 
 # =========================
 # =========================
@@ -1196,6 +1200,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
