@@ -467,7 +467,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
 
     return fig
 # =========================phase 2 chart
- def spc_combined_phase2(
+def spc_combined_phase2(
     lab, line, title,
     lab_lim, line_lim,
     control_batch_code
@@ -1203,6 +1203,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
