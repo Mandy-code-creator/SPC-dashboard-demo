@@ -524,6 +524,76 @@ for k in spc:
 )
     st.pyplot(fig)
     download(fig, f"COMBINED_{color}_{k}.png")
+# =========================
+# SPC PHASE II (SEPARATE CHART)
+# =========================
+st.markdown("## 📊 SPC Phase II (Monitoring)")
+
+if control_batch is not None:
+
+    for k in spc:
+
+        df_lab = spc[k]["lab"]
+        df_line = spc[k]["line"]
+
+        # ===== chỉ lấy batch >= control_batch =====
+        lab_p2 = df_lab[df_lab["Batch#"] >= control_batch]
+        line_p2 = df_line[df_line["Batch#"] >= control_batch]
+
+        if lab_p2.empty and line_p2.empty:
+            continue
+
+        # ===== giới hạn gốc từ Google Sheet =====
+        lab_lim = get_limit(color, k, "LAB")
+        line_lim = get_limit(color, k, "LINE")
+
+        fig, ax = plt.subplots(figsize=(12, 4))
+
+        # ===== LAB =====
+        if not lab_p2.empty:
+            ax.plot(
+                lab_p2["Batch#"],
+                lab_p2["value"],
+                marker="o",
+                label="LAB"
+            )
+
+        # ===== LINE =====
+        if not line_p2.empty:
+            ax.plot(
+                line_p2["Batch#"],
+                line_p2["value"],
+                marker="s",
+                label="LINE"
+            )
+
+        # ===== giới hạn kiểm soát (GIỮ NGUYÊN) =====
+        if lab_lim:
+            ax.axhline(lab_lim["UCL"], linestyle="-", linewidth=1)
+            ax.axhline(lab_lim["LCL"], linestyle="-", linewidth=1)
+            ax.axhline(lab_lim["TARGET"], linestyle=":")
+
+        if line_lim:
+            ax.axhline(line_lim["UCL"], linestyle="--", linewidth=1)
+            ax.axhline(line_lim["LCL"], linestyle="--", linewidth=1)
+
+        # ===== nhãn Phase II (kiểu Minitab) =====
+        ax.text(
+            control_batch,
+            ax.get_ylim()[1],
+            "Phase II",
+            fontsize=9,
+            ha="left",
+            va="top"
+        )
+
+        ax.set_title(f"SPC Phase II – {k}")
+        ax.set_xlabel("Batch")
+        ax.set_ylabel("Value")
+        ax.legend()
+        ax.grid(alpha=0.3)
+
+        st.pyplot(fig)
 
 
 
@@ -1126,6 +1196,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
