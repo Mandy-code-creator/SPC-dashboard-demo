@@ -411,7 +411,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     # ===== original lines (GIỮ NGUYÊN) =====
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
- # ===== control batch vertical line =====
+     # ===== control batch vertical line =====
     if control_batch_code is not None:
         ax.axvline(
             x=control_batch_code,
@@ -420,6 +420,20 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
             linewidth=2,
             label="Control batch start"
         )
+
+        # ===== label text for control batch =====
+        ax.text(
+            control_batch_code,
+            ax.get_ylim()[1],          # đặt chữ ở mép trên biểu đồ
+            "⬅ Bắt đầu kiểm soát",
+            color="red",
+            fontsize=10,
+            rotation=90,
+            verticalalignment="top",
+            horizontalalignment="right",
+            backgroundcolor="white"
+        )
+
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
     y_lab = lab["value"]
@@ -1115,6 +1129,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
