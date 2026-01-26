@@ -112,6 +112,7 @@ df.columns = (
 )
 # =========================
 # =========================
+# =========================
 # LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
@@ -184,10 +185,12 @@ st.sidebar.divider()
 
 
 # =========================
-# CONTROL BATCH INFO (SIDEBAR)
+# CONTROL BATCH INFO + BATCH ORDER
 # =========================
 control_batch = get_control_batch(color)
 st.sidebar.write("DEBUG Control_batch =", control_batch)
+
+control_batch_code = None
 
 if control_batch is not None and not df.empty:
 
@@ -200,6 +203,13 @@ if control_batch is not None and not df.empty:
     )
 
     batch_order["Batch#"] = batch_order.index + 1
+
+    # ===== MERGE Batch# BACK TO df =====
+    df = df.merge(
+        batch_order[["製造批號", "Batch#"]],
+        on="製造批號",
+        how="left"
+    )
 
     # ===== FIND CONTROL BATCH CODE =====
     row_cb = batch_order[batch_order["Batch#"] == control_batch]
@@ -218,7 +228,8 @@ if control_batch is not None and not df.empty:
 
 st.sidebar.divider()
 
-    # =========================
+
+# =========================
 # BEFORE / AFTER CONTROL SUMMARY
 # =========================
 if control_batch is not None and "Batch#" in df.columns:
@@ -236,9 +247,9 @@ if control_batch is not None and "Batch#" in df.columns:
             }
         return {
             "Period": label,
-            "Mean": round(data["Value"].mean(), 2),
-            "Std": round(data["Value"].std(), 2),
-            "n": int(data["Value"].count())
+            "Mean": round(data["value"].mean(), 2),
+            "Std": round(data["value"].std(), 2),
+            "n": int(data["value"].count())
         }
 
     summary_df = pd.DataFrame([
@@ -248,32 +259,6 @@ if control_batch is not None and "Batch#" in df.columns:
 
     st.subheader("📊 Before / After Control Summary")
     st.dataframe(summary_df, use_container_width=True)
-st.write("DEBUG df_before columns:", df_before.columns)
-    # ===== CONTROL BATCH ROW =====
-    row_cb = batch_order[batch_order["Batch#"] == control_batch]
-
-    if not row_cb.empty:
-        control_batch_code = row_cb.iloc[0]["製造批號"]
-    else:
-        control_batch_code = None
-
-    # ===== GET CONTROL BATCH CODE BY Batch# =====
-    row_cb = batch_order[batch_order["Batch#"] == control_batch]
-
-    if not row_cb.empty:
-        control_batch_code = row_cb["製造批號"].values[0]
-
-        st.sidebar.info(
-            f"🔔 **Control batch**\n\n"
-            f"Batch #{control_batch} → **{control_batch_code}**"
-        )
-    else:
-        st.sidebar.warning(
-            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
-        )
-
-st.sidebar.divider()
-
 
 # =========================
 # LIMIT DISPLAY
@@ -1174,6 +1159,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
