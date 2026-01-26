@@ -192,6 +192,12 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} LCL", [None]).values[0],
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
+def get_control_batch(color):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None
+    return row["Control_batch"].values[0]
+
 # =========================
 # OUT-OF-CONTROL DETECTION
 # =========================
@@ -1046,6 +1052,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
