@@ -910,49 +910,51 @@ for i, k in enumerate(spc):
 # =========================
 # 🚨 OUT-OF-CONTROL BATCH TABLE
 # =========================
+# 🚨 OUT-OF-CONTROL BATCH TABLE
+# =========================
 st.markdown("## 🚨 Out-of-Control Batches")
 
 ooc_rows = []
 
 for k in spc:
+
     # ===== LINE (PHASE II ONLY) =====
-lcl, ucl = get_limit(color, k, "LINE")
+    lcl, ucl = get_limit(color, k, "LINE")
 
-line_phase2 = spc[k]["line"][
-    spc[k]["line"]["製造批號"] >= control_batch_code
-]
+    line_phase2 = spc[k]["line"][
+        spc[k]["line"]["製造批號"] >= control_batch_code
+    ]
 
-ooc_line = detect_out_of_control(line_phase2, lcl, ucl)
+    ooc_line = detect_out_of_control(line_phase2, lcl, ucl)
 
-for _, r in ooc_line.iterrows():
-    ooc_rows.append({
-        "Factor": k,
-        "Type": "LINE",
-        "製造批號": r["製造批號"],
-        "Value": round(r["value"], 2),
-        "Rule_CL": r["Rule_CL"],
-        "Rule_3Sigma": r["Rule_3Sigma"]
-    })
-    # ===== LAB =====
-   # ===== LAB (PHASE II ONLY) =====
-lcl, ucl = get_limit(color, k, "LAB")
+    for _, r in ooc_line.iterrows():
+        ooc_rows.append({
+            "Factor": k,
+            "Type": "LINE",
+            "製造批號": r["製造批號"],
+            "Value": round(r["value"], 2),
+            "Rule_CL": r["Rule_CL"],
+            "Rule_3Sigma": r["Rule_3Sigma"]
+        })
 
-lab_phase2 = spc[k]["lab"][
-    spc[k]["lab"]["製造批號"] >= control_batch_code
-]
+    # ===== LAB (PHASE II ONLY) =====
+    lcl, ucl = get_limit(color, k, "LAB")
 
-ooc_lab = detect_out_of_control(lab_phase2, lcl, ucl)
+    lab_phase2 = spc[k]["lab"][
+        spc[k]["lab"]["製造批號"] >= control_batch_code
+    ]
 
-for _, r in ooc_lab.iterrows():
-    ooc_rows.append({
-        "Factor": k,
-        "Type": "LAB",
-        "製造批號": r["製造批號"],
-        "Value": round(r["value"], 2),
-        "Rule_CL": r["Rule_CL"],
-        "Rule_3Sigma": r["Rule_3Sigma"]
-    })
+    ooc_lab = detect_out_of_control(lab_phase2, lcl, ucl)
 
+    for _, r in ooc_lab.iterrows():
+        ooc_rows.append({
+            "Factor": k,
+            "Type": "LAB",
+            "製造批號": r["製造批號"],
+            "Value": round(r["value"], 2),
+            "Rule_CL": r["Rule_CL"],
+            "Rule_3Sigma": r["Rule_3Sigma"]
+        })
 
 if ooc_rows:
     ooc_df = pd.DataFrame(ooc_rows)
@@ -1226,6 +1228,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
