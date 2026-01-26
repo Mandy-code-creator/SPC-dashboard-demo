@@ -1233,13 +1233,15 @@ st.dataframe(
 # ==========================================================
 # 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
 # ==========================================================
+# ==========================================================
 # 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
+#    Phase II determined by 製造批號 + Time
 # ==========================================================
 
 st.markdown("---")
 st.markdown("## 🔬 Phase II – Thickness Correlation")
 
-THICK_COL = "Avergage Thickness"   # 👈 alias đúng tên cột thật
+THICK_COL = "Avergage Thickness"   # tên cột độ dày thật
 
 show_thickness = st.checkbox(
     "Show Thickness vs Color correlation (Phase II only)",
@@ -1249,77 +1251,89 @@ show_thickness = st.checkbox(
 if show_thickness:
 
     # ===== SAFETY CHECK =====
+    required_cols = {"製造批號", "Time", THICK_COL}
+    missing = required_cols - set(df.columns)
+
     if control_batch is None:
         st.warning("⚠ Control batch not defined.")
-    
-    elif THICK_COL not in df.columns:
-        st.warning(f"⚠ {THICK_COL} column not found in data.")
-    
-    elif "Batch#" not in df.columns:
-        st.warning("⚠ Batch# not found. Phase II cannot be determined.")
-    
+
+    elif missing:
+        st.warning(f"⚠ Missing columns: {', '.join(missing)}")
+
     else:
-        # ===== PHASE II DATA ONLY =====
-        df_p2 = df[df["Batch#"] > control_batch].copy()
+        # ===== FIND CONTROL BATCH TIME =====
+        control_code = control_batch_code   # đã tồn tại ở app phía trên
 
-        if df_p2.empty:
-            st.info("ℹ No Phase II data available.")
+        ctrl_rows = df[df["製造批號"] == control_code]
+
+        if ctrl_rows.empty:
+            st.warning("⚠ Control batch not found in data.")
         else:
-            # ===== OUT-OF-CONTROL FLAG (READ ONLY) =====
-            if "ooc_df" in globals() and not ooc_df.empty:
-                ooc_batches = set(ooc_df["製造批號"])
-                df_p2["OOC"] = df_p2["製造批號"].isin(ooc_batches)
+            control_time = ctrl_rows["Time"].min()
+
+            # ===== PHASE II DATA (BY TIME) =====
+            df_p2 = df[df["Time"] > control_time].copy()
+
+            if df_p2.empty:
+                st.info("ℹ No Phase II data available.")
             else:
-                df_p2["OOC"] = False
-
-            # ===== SELECT COLOR FACTOR =====
-            factors = [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns]
-
-            if not factors:
-                st.warning("⚠ No color factor columns found.")
-            else:
-                factor = st.selectbox(
-                    "Select Color Factor",
-                    factors,
-                    index=2 if "Δb" in factors else 0
-                )
-
-                # ===== SCATTER PLOT =====
-                fig, ax = plt.subplots()
-
-                normal = df_p2[~df_p2["OOC"]]
-                ooc = df_p2[df_p2["OOC"]]
-
-                ax.scatter(
-                    normal[THICK_COL],
-                    normal[factor],
-                    label="Normal"
-                )
-
-                ax.scatter(
-                    ooc[THICK_COL],
-                    ooc[factor],
-                    label="Out-of-Control"
-                )
-
-                ax.set_xlabel(THICK_COL)
-                ax.set_ylabel(factor)
-                ax.set_title(f"Phase II: {THICK_COL} vs {factor}")
-
-                ax.legend()
-                st.pyplot(fig)
-
-                # ===== CORRELATION METRIC =====
-                valid = df_p2[[THICK_COL, factor]].dropna()
-
-                if len(valid) > 2:
-                    corr = valid[THICK_COL].corr(valid[factor])
-                    st.metric(
-                        f"{THICK_COL} – {factor} Correlation (Phase II)",
-                        f"{corr:.2f}"
-                    )
+                # ===== OUT-OF-CONTROL FLAG (READ ONLY) =====
+                if "ooc_df" in globals() and not ooc_df.empty:
+                    ooc_batches = set(ooc_df["製造批號"])
+                    df_p2["OOC"] = df_p2["製造批號"].isin(ooc_batches)
                 else:
-                    st.info("ℹ Not enough data to calculate correlation.")
+                    df_p2["OOC"] = False
+
+                # ===== SELECT COLOR FACTOR =====
+                factors = [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns]
+
+                if not factors:
+                    st.warning("⚠ No color factor columns found.")
+                else:
+                    factor = st.selectbox(
+                        "Select Color Factor",
+                        factors,
+                        index=2 if "Δb" in factors else 0
+                    )
+
+                    # ===== SCATTER PLOT =====
+                    fig, ax = plt.subplots()
+
+                    normal = df_p2[~df_p2["OOC"]]
+                    ooc = df_p2[df_p2["OOC"]]
+
+                    ax.scatter(
+                        normal[THICK_COL],
+                        normal[factor],
+                        label="Normal"
+                    )
+
+                    ax.scatter(
+                        ooc[THICK_COL],
+                        ooc[factor],
+                        label="Out-of-Control"
+                    )
+
+                    ax.set_xlabel(THICK_COL)
+                    ax.set_ylabel(factor)
+                    ax.set_title(f"Phase II: {THICK_COL} vs {factor}")
+
+                    ax.legend()
+                    st.pyplot(fig)
+
+                    # ===== CORRELATION METRIC =====
+                    valid = df_p2[[THICK_COL, factor]].dropna()
+
+                    if len(valid) > 2:
+                        corr = valid[THICK_COL].corr(valid[factor])
+                        st.metric(
+                            f"{THICK_COL} – {factor} Correlation (Phase II)",
+                            f"{corr:.2f}"
+                        )
+                    else:
+                        st.info("ℹ Not enough data to calculate correlation.")
+
+
 
 
 
