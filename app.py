@@ -546,10 +546,12 @@ for k in spc:
     fig, ax = plt.subplots(figsize=(12, 4))
 
     # LAB
-    ax.plot(lab_p2.index + 1, lab_p2["Value"], "o-", label="LAB")
+    ax.plot(lab_p2.index + 1, lab_p2[k], "o-", label="LAB")
+
 
     # LINE
-    ax.plot(line_p2.index + 1, line_p2["Value"], "s-", label="LINE")
+    ax.plot(line_p2.index + 1, line_p2[k], "s-", label="LINE")
+
 
     ax.set_title(f"Phase II – {k}")
     ax.legend()
@@ -1156,6 +1158,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
