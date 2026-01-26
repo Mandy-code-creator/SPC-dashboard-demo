@@ -185,11 +185,11 @@ st.sidebar.divider()
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
 if control_batch is not None and not df.empty:
 
+    # ===== CREATE BATCH ORDER (START FROM 1) =====
     batch_order = (
         df.sort_values("Time")
           .groupby("製造批號", as_index=False)
@@ -197,21 +197,22 @@ if control_batch is not None and not df.empty:
           .reset_index(drop=True)
     )
 
-    if 1 <= control_batch <= len(batch_order):
-        control_batch_code = batch_order.loc[
-            control_batch - 1, "製造批號"
-        ]
+    batch_order["Batch#"] = batch_order.index + 1
 
-        st.sidebar.info(
-            f"🔔 **Control batch**\n\n"
-            f"Batch #{control_batch} → **{control_batch_code}**"
-        )
+    df = df.merge(
+        batch_order[["製造批號", "Batch#"]],
+        on="製造批號",
+        how="left"
+    )
+
+    # ===== CONTROL BATCH ROW =====
+    row_cb = batch_order[batch_order["Batch#"] == control_batch]
+
+    if not row_cb.empty:
+        control_batch_code = row_cb.iloc[0]["製造批號"]
     else:
-        st.sidebar.warning(
-            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
-        )
+        control_batch_code = None
 
-st.sidebar.divider()
 
 # =========================
 # LIMIT DISPLAY
@@ -1086,6 +1087,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
