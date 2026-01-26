@@ -107,7 +107,18 @@ df.columns = (
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
-# LIMIT FUNCTION
+
+limit_df.columns = (
+    limit_df.columns
+    .str.replace("\r\n", " ", regex=False)
+    .str.replace("\n", " ", regex=False)
+    .str.replace("　", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+    .str.strip()
+)
+
+# =========================
+# FUNCTIONS
 # =========================
 def get_limit(color, prefix, factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -117,53 +128,22 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} LCL", [None]).values[0],
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
+
 def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
-
     if row.empty:
         return None
 
     value = row["Control_batch"].values[0]
 
-    # nếu trống / NaN
     if pd.isna(value):
         return None
 
     try:
         return int(float(value))
-    except ValueError:
+    except:
         return None
 
-
-# =========================
-# CONTROL BATCH INFO (SIDEBAR)
-# =========================
-control_batch = get_control_batch(color)
-
-if control_batch is not None:
-    # batch list theo thứ tự thời gian
-    batch_order = (
-        df.sort_values("Time")
-          .groupby("製造批號", as_index=False)
-          .first()
-          .reset_index(drop=True)
-    )
-
-    if control_batch <= len(batch_order):
-        control_batch_code = batch_order.loc[
-            control_batch - 1, "製造批號"
-        ]
-
-        st.sidebar.info(
-            f"🔔 Control from batch\n\n"
-            f"Batch #{int(control_batch)} → **{control_batch_code}**"
-        )
-    else:
-        st.sidebar.warning(
-            f"⚠ Control batch #{int(control_batch)} vượt quá số batch hiện có"
-        )
-
-st.sidebar.divider()
 # =========================
 # SIDEBAR – FILTER
 # =========================
@@ -174,27 +154,58 @@ color = st.sidebar.selectbox(
     sorted(df["塗料編號"].dropna().unique())
 )
 
-df = df[df["塗料編號"] == color]
+# filter theo màu
+df_color = df[df["塗料編號"] == color].copy()
 
-latest_year = df["Time"].dt.year.max()
+latest_year = df_color["Time"].dt.year.max()
 year = st.sidebar.selectbox(
     "Year",
-    sorted(df["Time"].dt.year.unique()),
-    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+    sorted(df_color["Time"].dt.year.unique()),
+    index=list(sorted(df_color["Time"].dt.year.unique())).index(latest_year)
 )
 
 month = st.sidebar.multiselect(
     "Month (optional)",
-    sorted(df["Time"].dt.month.unique())
+    sorted(df_color["Time"].dt.month.unique())
 )
 
-df = df[df["Time"].dt.year == year]
+df_color = df_color[df_color["Time"].dt.year == year]
 if month:
-    df = df[df["Time"].dt.month.isin(month)]
-# =========================
+    df_color = df_color[df_color["Time"].dt.month.isin(month)]
 
 # =========================
-# LIMIT DISPLAY
+# CONTROL BATCH INFO (SIDEBAR)
+# =========================
+control_batch = get_control_batch(color)
+
+if control_batch is not None:
+    batch_order = (
+        df_color.sort_values("Time")
+        .groupby("製造批號", as_index=False)
+        .first()
+        .reset_index(drop=True)
+    )
+
+    if len(batch_order) == 0:
+        st.sidebar.warning("⚠ Không có batch sau khi filter")
+    elif control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
+
+        st.sidebar.info(
+            f"🔔 Control from batch\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
+    else:
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} > số batch hiện có ({len(batch_order)})"
+        )
+
+st.sidebar.divider()
+
+# =========================
+# LIMIT DISPLAY (OPTIONAL)
 # =========================
 def show_limits(factor):
     row = limit_df[limit_df["Color_code"] == color]
@@ -204,7 +215,11 @@ def show_limits(factor):
     for c in table.columns:
         table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
     st.sidebar.markdown(f"**{factor} Control Limits**")
-    st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
+    st.sidebar.dataframe(
+        table,
+        use_container_width=True,
+        hide_index=True
+    )
 
 show_limits("LAB")
 show_limits("LINE")
@@ -1064,6 +1079,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
