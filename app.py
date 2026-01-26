@@ -464,9 +464,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     ax.tick_params(axis="x", rotation=45)
     fig.subplots_adjust(right=0.78)
 
-    return fig
-
-
 def spc_single(spc, title, limit, color):
     fig, ax = plt.subplots(figsize=(12, 4))
 
@@ -1261,6 +1258,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
