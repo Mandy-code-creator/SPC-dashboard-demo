@@ -82,14 +82,6 @@ df = load_data()
 limit_df = load_limit()
 
 # =========================
-# DEBUG LIMIT_DF (STEP 1)
-# =========================
-st.sidebar.write("🔍 DEBUG limit_df columns:")
-st.sidebar.write(limit_df.columns.tolist())
-
-st.sidebar.write("🔍 DEBUG limit_df sample:")
-st.sidebar.dataframe(limit_df.head())
-
 
 # ===== CHỌN NĂM =====
 df["date"] = pd.to_datetime(df["Time"])
@@ -1079,6 +1071,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
