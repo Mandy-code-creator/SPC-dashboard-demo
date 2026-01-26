@@ -529,8 +529,18 @@ for k in spc:
 for k in spc:
 
     # ===== 1. CẮT DỮ LIỆU TỪ BATCH KIỂM SOÁT =====
-    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
-    line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
+    lab_p2 = (
+    spc[k]["lab"]
+    .merge(batch_order[["製造批號", "Batch#"]], on="製造批號", how="left")
+)
+lab_p2 = lab_p2[lab_p2["製造批號"] >= control_batch_code]
+
+line_p2 = (
+    spc[k]["line"]
+    .merge(batch_order[["製造批號", "Batch#"]], on="製造批號", how="left")
+)
+line_p2 = line_p2[line_p2["製造批號"] >= control_batch_code]
+
 
     if lab_p2.empty and line_p2.empty:
         continue
@@ -1188,6 +1198,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
