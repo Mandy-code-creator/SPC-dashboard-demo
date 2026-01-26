@@ -534,30 +534,32 @@ for k in spc:
 # =========================
 # ===== Phase II SPC (Monitoring only) =====
 st.markdown("## 📊 SPC Phase II (Monitoring)")
-
 for k in spc:
 
-    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
-    line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
+    lab_df = spc[k]["lab"]
+    line_df = spc[k]["line"]
+
+    # lấy cột giá trị (cột số duy nhất)
+    lab_val_col  = lab_df.select_dtypes(include="number").columns[0]
+    line_val_col = line_df.select_dtypes(include="number").columns[0]
+
+    lab_p2  = lab_df[lab_df["製造批號"] >= control_batch_code]
+    line_p2 = line_df[line_df["製造批號"] >= control_batch_code]
 
     if lab_p2.empty and line_p2.empty:
         continue
 
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    # LAB
-    ax.plot(lab_p2.index + 1, lab_p2[k], "o-", label="LAB")
-
-
-    # LINE
-    ax.plot(line_p2.index + 1, line_p2[k], "s-", label="LINE")
-
+    ax.plot(lab_p2.index + 1,  lab_p2[lab_val_col],  "o-", label="LAB")
+    ax.plot(line_p2.index + 1, line_p2[line_val_col], "s-", label="LINE")
 
     ax.set_title(f"Phase II – {k}")
     ax.legend()
     ax.grid(alpha=0.3)
 
     st.pyplot(fig)
+
 
 # =========================
 # =========================
@@ -1158,6 +1160,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
