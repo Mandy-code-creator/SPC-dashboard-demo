@@ -201,11 +201,22 @@ if control_batch is not None and not df.empty:
 
     batch_order["Batch#"] = batch_order.index + 1
 
-    df = df.merge(
-        batch_order[["製造批號", "Batch#"]],
-        on="製造批號",
-        how="left"
-    )
+    # ===== FIND CONTROL BATCH CODE =====
+    row_cb = batch_order[batch_order["Batch#"] == control_batch]
+
+    if not row_cb.empty:
+        control_batch_code = row_cb.iloc[0]["製造批號"]
+
+        st.sidebar.info(
+            f"🔔 **Control batch**\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
+    else:
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} không tồn tại trong dữ liệu"
+        )
+
+st.sidebar.divider()
 
     # =========================
 # BEFORE / AFTER CONTROL SUMMARY
@@ -1163,6 +1174,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
