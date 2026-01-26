@@ -1233,9 +1233,13 @@ st.dataframe(
 # ==========================================================
 # 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
 # ==========================================================
+# 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
+# ==========================================================
 
 st.markdown("---")
 st.markdown("## 🔬 Phase II – Thickness Correlation")
+
+THICK_COL = "Avergage Thickness"   # 👈 alias đúng tên cột thật
 
 show_thickness = st.checkbox(
     "Show Thickness vs Color correlation (Phase II only)",
@@ -1248,8 +1252,8 @@ if show_thickness:
     if control_batch is None:
         st.warning("⚠ Control batch not defined.")
     
-    elif "Thickness" not in df.columns:
-        st.warning("⚠ Thickness column not found in data.")
+    elif THICK_COL not in df.columns:
+        st.warning(f"⚠ {THICK_COL} column not found in data.")
     
     elif "Batch#" not in df.columns:
         st.warning("⚠ Batch# not found. Phase II cannot be determined.")
@@ -1269,47 +1273,53 @@ if show_thickness:
                 df_p2["OOC"] = False
 
             # ===== SELECT COLOR FACTOR =====
-            factor = st.selectbox(
-                "Select Color Factor",
-                [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns],
-                index=2 if "Δb" in df_p2.columns else 0
-            )
+            factors = [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns]
 
-            # ===== SCATTER PLOT =====
-            fig, ax = plt.subplots()
-
-            normal = df_p2[~df_p2["OOC"]]
-            ooc = df_p2[df_p2["OOC"]]
-
-            ax.scatter(
-                normal["Thickness"],
-                normal[factor],
-                label="Normal"
-            )
-
-            ax.scatter(
-                ooc["Thickness"],
-                ooc[factor],
-                label="Out-of-Control"
-            )
-
-            ax.set_xlabel("Thickness")
-            ax.set_ylabel(factor)
-            ax.set_title(f"Phase II: Thickness vs {factor}")
-
-            ax.legend()
-            st.pyplot(fig)
-
-            # ===== CORRELATION METRIC =====
-            if df_p2["Thickness"].notna().sum() > 2:
-                corr = df_p2["Thickness"].corr(df_p2[factor])
-                st.metric(
-                    f"Thickness – {factor} Correlation (Phase II)",
-                    f"{corr:.2f}"
-                )
+            if not factors:
+                st.warning("⚠ No color factor columns found.")
             else:
-                st.info("ℹ Not enough data to calculate correlation.")
+                factor = st.selectbox(
+                    "Select Color Factor",
+                    factors,
+                    index=2 if "Δb" in factors else 0
+                )
 
+                # ===== SCATTER PLOT =====
+                fig, ax = plt.subplots()
+
+                normal = df_p2[~df_p2["OOC"]]
+                ooc = df_p2[df_p2["OOC"]]
+
+                ax.scatter(
+                    normal[THICK_COL],
+                    normal[factor],
+                    label="Normal"
+                )
+
+                ax.scatter(
+                    ooc[THICK_COL],
+                    ooc[factor],
+                    label="Out-of-Control"
+                )
+
+                ax.set_xlabel(THICK_COL)
+                ax.set_ylabel(factor)
+                ax.set_title(f"Phase II: {THICK_COL} vs {factor}")
+
+                ax.legend()
+                st.pyplot(fig)
+
+                # ===== CORRELATION METRIC =====
+                valid = df_p2[[THICK_COL, factor]].dropna()
+
+                if len(valid) > 2:
+                    corr = valid[THICK_COL].corr(valid[factor])
+                    st.metric(
+                        f"{THICK_COL} – {factor} Correlation (Phase II)",
+                        f"{corr:.2f}"
+                    )
+                else:
+                    st.info("ℹ Not enough data to calculate correlation.")
 
 
 
