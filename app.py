@@ -903,21 +903,9 @@ mean = data.mean()
 std = data.std()
 
 # ---- NORMAL PDF (NO SCIPY) ----
-x = np.linspace(data.min(), data.max(), 200)
+x = np.linspace(mean - 5*std, mean + 5*std, 1000)
 y = (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
     -0.5 * ((x - mean) / std) ** 2
-)
-
-# ---- PLOT ----
-fig, ax = plt.subplots(figsize=(10, 4))
-
-# Histogram
-ax.hist(
-    data,
-    bins=20,
-    density=True,
-    alpha=0.6,
-    label="Thickness Distribution"
 )
 
 # Normal curve
@@ -927,6 +915,9 @@ ax.plot(
     linewidth=3,
     label="Normal Distribution"
 )
+
+ax.set_xlim(mean - 5*std, mean + 5*std)
+
 
 # Mean & Spec
 ax.axvline(mean, linestyle="--", linewidth=2,
@@ -962,6 +953,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
