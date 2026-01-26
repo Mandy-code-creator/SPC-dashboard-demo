@@ -211,6 +211,7 @@ def get_limit(color, prefix, factor):
     except:
         return None
 
+
 # =========================
 # OUT-OF-CONTROL DETECTION
 # =========================
@@ -1064,6 +1065,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
