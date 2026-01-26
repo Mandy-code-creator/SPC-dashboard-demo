@@ -172,7 +172,8 @@ st.sidebar.divider()
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-
+# 🔍 DEBUG – ĐẶT NGAY TẠI ĐÂY
+st.sidebar.write("DEBUG Control_batch =", control_batch)
 if control_batch is not None and not df.empty:
 
     # SẮP XẾP BATCH THEO TIME – GIỐNG BIỂU ĐỒ COMBINED
@@ -1073,6 +1074,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
