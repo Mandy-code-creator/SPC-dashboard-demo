@@ -574,11 +574,15 @@ def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code)
 # =========================
 st.markdown("---")
 st.subheader("📊 SPC Combined Chart (LAB + LINE) – Phase II")
+
 for k in ["ΔL", "Δa", "Δb"]:
 
+    lab_df = df_lab[df_lab["項目"] == k]
+    line_df = df_line[df_line["項目"] == k]
+
     fig = spc_combined_phase2(
-        lab=lab_dict[k],
-        line=line_dict[k],
+        lab=lab_df,
+        line=line_df,
         title=f"{k} – LAB + LINE (Phase II)",
         lab_lim=lab_limits[k],
         line_lim=line_limits[k],
@@ -588,6 +592,7 @@ for k in ["ΔL", "Δa", "Δb"]:
     if fig is not None:
         st.pyplot(fig)
         download(fig, f"COMBINED_{color}_{k}.png")
+
 # =========================
 def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
     if control_batch_code is None:
@@ -1233,6 +1238,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
