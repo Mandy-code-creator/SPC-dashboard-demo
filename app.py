@@ -389,9 +389,35 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    # ===== original lines (GIỮ NGUYÊN) =====
-    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+    ax.plot(lab["Batch#"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["Batch#"], line["value"], "o-", label="LINE", color="#2ca02c")
+
+    # ===== CONTROL START BATCH =====
+    if control_batch is not None:
+        ax.axvline(
+            x=control_batch,
+            color="red",
+            linestyle="--",
+            linewidth=2,
+            zorder=4
+        )
+
+        ax.text(
+            control_batch + 0.1,
+            ax.get_ylim()[1],
+            f"Control start\nBatch #{control_batch}\n{control_batch_code}",
+            color="red",
+            fontsize=9,
+            verticalalignment="top"
+        )
+
+    ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    fig.subplots_adjust(right=0.78)
+
+    return fig   # ← PHẢI THỤT LỀ 4 SPACE
 
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
@@ -1087,6 +1113,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
