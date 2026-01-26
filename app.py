@@ -1230,6 +1230,86 @@ st.dataframe(
 # =========================
 
 
+# ==========================================================
+# 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
+# ==========================================================
+
+st.markdown("---")
+st.markdown("## 🔬 Phase II – Thickness Correlation")
+
+show_thickness = st.checkbox(
+    "Show Thickness vs Color correlation (Phase II only)",
+    value=False
+)
+
+if show_thickness:
+
+    # ===== SAFETY CHECK =====
+    if control_batch is None:
+        st.warning("⚠ Control batch not defined.")
+    
+    elif "Thickness" not in df.columns:
+        st.warning("⚠ Thickness column not found in data.")
+    
+    elif "Batch#" not in df.columns:
+        st.warning("⚠ Batch# not found. Phase II cannot be determined.")
+    
+    else:
+        # ===== PHASE II DATA ONLY =====
+        df_p2 = df[df["Batch#"] > control_batch].copy()
+
+        if df_p2.empty:
+            st.info("ℹ No Phase II data available.")
+        else:
+            # ===== OUT-OF-CONTROL FLAG (READ ONLY) =====
+            if "ooc_df" in globals() and not ooc_df.empty:
+                ooc_batches = set(ooc_df["製造批號"])
+                df_p2["OOC"] = df_p2["製造批號"].isin(ooc_batches)
+            else:
+                df_p2["OOC"] = False
+
+            # ===== SELECT COLOR FACTOR =====
+            factor = st.selectbox(
+                "Select Color Factor",
+                [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns],
+                index=2 if "Δb" in df_p2.columns else 0
+            )
+
+            # ===== SCATTER PLOT =====
+            fig, ax = plt.subplots()
+
+            normal = df_p2[~df_p2["OOC"]]
+            ooc = df_p2[df_p2["OOC"]]
+
+            ax.scatter(
+                normal["Thickness"],
+                normal[factor],
+                label="Normal"
+            )
+
+            ax.scatter(
+                ooc["Thickness"],
+                ooc[factor],
+                label="Out-of-Control"
+            )
+
+            ax.set_xlabel("Thickness")
+            ax.set_ylabel(factor)
+            ax.set_title(f"Phase II: Thickness vs {factor}")
+
+            ax.legend()
+            st.pyplot(fig)
+
+            # ===== CORRELATION METRIC =====
+            if df_p2["Thickness"].notna().sum() > 2:
+                corr = df_p2["Thickness"].corr(df_p2[factor])
+                st.metric(
+                    f"Thickness – {factor} Correlation (Phase II)",
+                    f"{corr:.2f}"
+                )
+            else:
+                st.info("ℹ Not enough data to calculate correlation.")
+
 
 
 
