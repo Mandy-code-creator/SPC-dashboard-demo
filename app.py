@@ -425,7 +425,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
         ax.text(
             control_batch_code,
             ax.get_ylim()[1],          # đặt chữ ở mép trên biểu đồ
-            "⬅ Bắt đầu kiểm soát",
+            "⬅ Control batch start",
             color="red",
             fontsize=10,
             rotation=90,
@@ -1129,6 +1129,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
