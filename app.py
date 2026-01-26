@@ -412,7 +412,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
      # ===== Phase change (Minitab style) =====
-if control_batch_code is not None:
+    if control_batch_code is not None:
     ax.axvline(
         x=control_batch_code,
         color="#b22222",
@@ -1125,6 +1125,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
