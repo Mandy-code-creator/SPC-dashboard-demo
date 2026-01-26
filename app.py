@@ -111,8 +111,6 @@ df.columns = (
     .str.strip()
 )
 # =========================
-# =========================
-# =========================
 # LIMIT FUNCTION
 # =========================
 def get_limit(color, prefix, factor):
@@ -124,10 +122,7 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
 
-
-# =========================
-# CONTROL BATCH FUNCTION
-# =========================
+# CONTROL BATCH FUNCTION  
 def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
 
@@ -146,7 +141,7 @@ def get_control_batch(color):
         if m:
             return int(m.group())
 
-    # numeric
+    # số thuần
     try:
         return int(float(value))
     except:
@@ -182,19 +177,19 @@ if month:
     df = df[df["Time"].dt.month.isin(month)]
 
 st.sidebar.divider()
-
+# =========================
 
 # =========================
-# CONTROL BATCH INFO + BATCH ORDER
+# =========================
+# =========================
+# CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-st.sidebar.write("DEBUG Control_batch =", control_batch)
 
-control_batch_code = None
+st.sidebar.write("DEBUG Control_batch =", control_batch)
 
 if control_batch is not None and not df.empty:
 
-    # ===== CREATE BATCH ORDER (START FROM 1) =====
     batch_order = (
         df.sort_values("Time")
           .groupby("製造批號", as_index=False)
@@ -202,20 +197,10 @@ if control_batch is not None and not df.empty:
           .reset_index(drop=True)
     )
 
-    batch_order["Batch#"] = batch_order.index + 1
-
-    # ===== MERGE Batch# BACK TO df =====
-    df = df.merge(
-        batch_order[["製造批號", "Batch#"]],
-        on="製造批號",
-        how="left"
-    )
-
-    # ===== FIND CONTROL BATCH CODE =====
-    row_cb = batch_order[batch_order["Batch#"] == control_batch]
-
-    if not row_cb.empty:
-        control_batch_code = row_cb.iloc[0]["製造批號"]
+    if 1 <= control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
 
         st.sidebar.info(
             f"🔔 **Control batch**\n\n"
@@ -223,42 +208,10 @@ if control_batch is not None and not df.empty:
         )
     else:
         st.sidebar.warning(
-            f"⚠ Control batch #{control_batch} không tồn tại trong dữ liệu"
+            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
         )
 
 st.sidebar.divider()
-
-
-# =========================
-# BEFORE / AFTER CONTROL SUMMARY
-# =========================
-if control_batch is not None and "Batch#" in df.columns:
-
-    df_before = df[df["Batch#"] < control_batch]
-    df_after  = df[df["Batch#"] >= control_batch]
-
-    def summary_block(data, label):
-        if data.empty:
-            return {
-                "Period": label,
-                "Mean": None,
-                "Std": None,
-                "n": 0
-            }
-        return {
-            "Period": label,
-            "Mean": round(data["value"].mean(), 2),
-            "Std": round(data["value"].std(), 2),
-            "n": int(data["value"].count())
-        }
-
-    summary_df = pd.DataFrame([
-        summary_block(df_before, "Before Control"),
-        summary_block(df_after,  "After Control")
-    ])
-
-    st.subheader("📊 Before / After Control Summary")
-    st.dataframe(summary_df, use_container_width=True)
 
 # =========================
 # LIMIT DISPLAY
@@ -438,32 +391,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     # ===== original lines (GIỮ NGUYÊN) =====
     ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
     ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
-   # ===== CONTROL START BATCH (VERTICAL LINE) =====
-    if control_batch is not None and control_batch_code is not None:
-    
-        x_labels = lab["製造批號"].tolist()
-    
-        if control_batch_code in x_labels:
-            x_pos = x_labels.index(control_batch_code)
-    
-            ax.axvline(
-                x=x_pos,
-                color="red",
-                linestyle="--",
-                linewidth=2,
-                zorder=4
-            )
-    
-            ax.text(
-                x_pos + 0.05,
-                ax.get_ylim()[1],
-                f"Control start\nBatch #{control_batch}\n{control_batch_code}",
-                color="red",
-                fontsize=9,
-                verticalalignment="top"
-            )
-
-
 
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
@@ -1159,18 +1086,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
