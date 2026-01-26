@@ -870,7 +870,34 @@ ax2.set_title("ΔE Distribution")
 ax2.grid(True, linestyle="--", alpha=0.4)
 
 st.pyplot(fig2)
+# Normal curve (ĐƯỜNG)
+ax.plot(
+    x,
+    y,
+    linewidth=3,
+    label="Normal Distribution"
+)
 
+# Mean & Spec
+ax.axvline(mean, linestyle="--", linewidth=2, label="Mean")
+ax.axvline(LSL, linestyle="--", linewidth=2, label="LSL")
+ax.axvline(USL, linestyle="--", linewidth=2, label="USL")
+
+# Không bị cắt đuôi
+ax.set_xlim(mean - 5*std, mean + 5*std)
+
+ax.set_xlabel("Thickness")
+ax.set_ylabel("Density")
+ax.legend()
+ax.grid(alpha=0.3)
+
+
+# Mean & Spec
+ax.axvline(mean, linestyle="--", linewidth=2,
+           label=f"Mean = {mean:.2f}")
+
+ax.axvline(LSL, linewidth=2, label="LSL")
+ax.axvline(USL, linewidth=2, label="USL")
 # =========================
 import numpy as np
 import math
@@ -985,6 +1012,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
