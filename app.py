@@ -766,7 +766,7 @@ else:
 # CROSS-COIL THICKNESS – COLOR ANALYSIS (BOTTOM)
 # ============================================================
 st.markdown("---")
-st.header("🎨 Thickness – Color Analysis (Per Coil)")
+st.header("🎨 LINE-Thickness – Color Analysis (Per Coil)")
 
 # =========================
 # COLUMN NAMES (FIX CỨNG)
@@ -1019,6 +1019,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
