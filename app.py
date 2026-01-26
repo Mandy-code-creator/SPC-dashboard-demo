@@ -136,34 +136,6 @@ def get_control_batch(color):
 
 
 # =========================
-# =========================
-# SIDEBAR – FILTER
-# =========================
-st.sidebar.title("🎨 Filter")
-
-color = st.sidebar.selectbox(
-    "Color code",
-    sorted(df["塗料編號"].dropna().unique())
-)
-
-df = df[df["塗料編號"] == color]
-
-latest_year = df["Time"].dt.year.max()
-year = st.sidebar.selectbox(
-    "Year",
-    sorted(df["Time"].dt.year.unique()),
-    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
-)
-
-month = st.sidebar.multiselect(
-    "Month (optional)",
-    sorted(df["Time"].dt.month.unique())
-)
-
-df = df[df["Time"].dt.year == year]
-if month:
-    df = df[df["Time"].dt.month.isin(month)]
-# =========================
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
@@ -192,6 +164,34 @@ if control_batch is not None:
         )
 
 st.sidebar.divider()
+# =========================
+# SIDEBAR – FILTER
+# =========================
+st.sidebar.title("🎨 Filter")
+
+color = st.sidebar.selectbox(
+    "Color code",
+    sorted(df["塗料編號"].dropna().unique())
+)
+
+df = df[df["塗料編號"] == color]
+
+latest_year = df["Time"].dt.year.max()
+year = st.sidebar.selectbox(
+    "Year",
+    sorted(df["Time"].dt.year.unique()),
+    index=list(sorted(df["Time"].dt.year.unique())).index(latest_year)
+)
+
+month = st.sidebar.multiselect(
+    "Month (optional)",
+    sorted(df["Time"].dt.month.unique())
+)
+
+df = df[df["Time"].dt.year == year]
+if month:
+    df = df[df["Time"].dt.month.isin(month)]
+# =========================
 
 # =========================
 # LIMIT DISPLAY
@@ -1064,6 +1064,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
