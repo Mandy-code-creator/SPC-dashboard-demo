@@ -154,10 +154,6 @@ def get_control_batch_code(df, control_batch):
     """
     if control_batch is None or df.empty:
         return None
-def filter_phase2(spc_df, control_batch_code):
-    if control_batch_code is None:
-        return pd.DataFrame()
-    return spc_df[spc_df["製造批號"] >= control_batch_code]
 
     batch_order = (
         df.sort_values("Time")
@@ -406,114 +402,34 @@ with col2:
 # SPC CHARTS (GIỮ NGUYÊN)
 # =========================
 def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
-    """
-    Combined SPC chart (LAB + LINE)
-    ⚠️ Phase / control batch KHÔNG xử lý trong hàm này
-    """
-
-    # ===== SAFETY CHECK =====
-    if lab is None or line is None:
-        return None
-    if lab.empty or line.empty:
-        return None
 
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    # ===== DATA =====
-    ax.plot(
-        lab["製造批號"],
-        lab["value"],
-        "o-",
-        label="LAB",
-        color="#1f77b4"
-    )
+    mean = line["value"].mean()
+    std = line["value"].std()
 
-    ax.plot(
-        line["製造批號"],
-        line["value"],
-        "o-",
-        label="LINE",
-        color="#2ca02c"
-    )
-
-    # ===== CONTROL LIMITS =====
-    LCL_lab, UCL_lab = lab_lim
-    if LCL_lab is not None and UCL_lab is not None:
-        ax.axhline(LCL_lab, color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(UCL_lab, color="#1f77b4", linestyle=":", label="LAB UCL")
-
-    LCL_line, UCL_line = line_lim
-    if LCL_line is not None and UCL_line is not None:
-        ax.axhline(LCL_line, color="red", linestyle="-", label="LINE LCL")
-        ax.axhline(UCL_line, color="red", linestyle="-", label="LINE UCL")
-
-    # ===== TITLE / STYLE =====
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-
-    fig.subplots_adjust(right=0.78)
-
-    return fig
-
-def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
-
-    lab2 = filter_phase2(lab, control_batch_code)
-    line2 = filter_phase2(line, control_batch_code)
-
-    if lab2.empty or line2.empty:
-        return None
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    ax.plot(lab2["製造批號"], lab2["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line2["製造批號"], line2["value"], "o-", label="LINE", color="#2ca02c")
-
-    ax.axvline(control_batch_code, color="#b22222", linestyle="--", linewidth=1.5)
-    ax.text(
-        control_batch_code,
-        ax.get_ylim()[1] * 0.97,
-        "Phase II",
-        color="#b22222",
-        fontsize=9,
-        ha="center",
-        va="top"
-    )
-
-    LCL_lab, UCL_lab = lab_lim
-    if LCL_lab is not None and UCL_lab is not None:
-        out_lab = (lab2["value"] < LCL_lab) | (lab2["value"] > UCL_lab)
-        ax.scatter(
-            lab2.loc[out_lab, "製造批號"],
-            lab2.loc[out_lab, "value"],
-            color="red", s=80, zorder=5
+    # ===== original lines (GIỮ NGUYÊN) =====
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
+     # ===== Phase change (Minitab style) =====
+    if control_batch_code is not None:
+        ax.axvline(
+            x=control_batch_code,
+            color="#b22222",
+            linestyle="--",
+            linewidth=1.5
         )
 
-    LCL_line, UCL_line = line_lim
-    if LCL_line is not None and UCL_line is not None:
-        out_line = (line2["value"] < LCL_line) | (line2["value"] > UCL_line)
-        ax.scatter(
-            line2.loc[out_line, "製造批號"],
-            line2.loc[out_line, "value"],
-            color="red", s=80, zorder=5
+        ax.text(
+            control_batch_code,
+            ax.get_ylim()[1] * 0.97,
+            "Phase II",
+            color="#b22222",
+            fontsize=9,
+            ha="center",
+            va="top"
         )
 
-    if LCL_lab is not None:
-        ax.axhline(LCL_lab, color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(UCL_lab, color="#1f77b4", linestyle=":", label="LAB UCL")
-
-    if LCL_line is not None:
-        ax.axhline(LCL_line, color="red", label="LINE LCL")
-        ax.axhline(UCL_line, color="red", label="LINE UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-
-    return fig
 
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
@@ -597,7 +513,8 @@ def download(fig, name):
 # DASHBOARD
 # =========================
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
-fig = spc_combined(
+for k in spc:
+    fig = spc_combined(
     spc[k]["lab"],
     spc[k]["line"],
     f"COMBINED {k}",
@@ -605,31 +522,9 @@ fig = spc_combined(
     get_limit(color, k, "LINE"),
     control_batch_code
 )
-
-if fig is not None:
     st.pyplot(fig)
     download(fig, f"COMBINED_{color}_{k}.png")
-else:
-    st.warning(f"⚠ {k}: No valid LAB / LINE data after filtering")
 
-
-st.markdown("### 📊 SPC COMBINED – Phase II (From Control Batch)")
-
-for k in spc:
-    fig = spc_combined_phase2(
-        spc[k]["lab"],
-        spc[k]["line"],
-        f"COMBINED {k} – Phase II",
-        get_limit(color, k, "LAB"),
-        get_limit(color, k, "LINE"),
-        control_batch_code
-    )
-
-    if fig is not None:
-        st.pyplot(fig)
-        download(fig, f"COMBINED_PHASE2_{color}_{k}.png")
-    else:
-        st.info(f"{k}: Not enough data after control batch")
 
 
 # =========================
@@ -1231,13 +1126,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
-
-
-
 
 
 
