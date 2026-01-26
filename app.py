@@ -557,7 +557,13 @@ def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code)
         linewidth=1.5,
         label="Phase II start"
     )
-
+# Out of control → đỏ
+    ooc_lab = (lab_df["Value"] > lab_lim["UCL"]) | (lab_df["Value"] < lab_lim["LCL"])
+    ax.scatter(
+        lab_df.loc[ooc_lab, "Batch#"],
+        lab_df.loc[ooc_lab, "Value"],
+        color="red",
+        zorder=5
     # ===== control limits (GIỐNG Y HỆT BIỂU ĐỒ CŨ) =====
     if lab_lim[0] is not None:
         ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
@@ -1241,6 +1247,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
