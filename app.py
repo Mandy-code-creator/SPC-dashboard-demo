@@ -656,8 +656,7 @@ for k in ["ΔL", "Δa", "Δb"]:
     ax.legend()
     ax.grid(True)
 
-    return fig
-
+ 
 # =========================
 # =========================
 # DISTRIBUTION DASHBOARD
@@ -1256,6 +1255,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
