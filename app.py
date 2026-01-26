@@ -134,10 +134,19 @@ def get_control_batch(color):
     if pd.isna(value):
         return None
 
+    # text: "Control_start_batch 9"
+    if isinstance(value, str):
+        import re
+        m = re.search(r"\d+", value)
+        if m:
+            return int(m.group())
+
+    # số thuần
     try:
         return int(float(value))
     except:
         return None
+
 
 # =========================
 # SIDEBAR – FILTER
@@ -172,31 +181,37 @@ st.sidebar.divider()
 
 # =========================
 # =========================
+# =========================
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
-def get_control_batch(color):
-    row = limit_df[limit_df["Color_code"] == color]
+control_batch = get_control_batch(color)
 
-    if row.empty:
-        return None
+st.sidebar.write("DEBUG Control_batch =", control_batch)
 
-    value = row["Control_batch"].values[0]
+if control_batch is not None and not df.empty:
 
-    if pd.isna(value):
-        return None
+    batch_order = (
+        df.sort_values("Time")
+          .groupby("製造批號", as_index=False)
+          .first()
+          .reset_index(drop=True)
+    )
 
-    # 👉 nếu là text kiểu "Control_start_batch 9"
-    if isinstance(value, str):
-        import re
-        match = re.search(r"\d+", value)
-        if match:
-            return int(match.group())
+    if 1 <= control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
 
-    # 👉 nếu là số thuần
-    try:
-        return int(float(value))
-    except:
-        return None
+        st.sidebar.info(
+            f"🔔 **Control batch**\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
+    else:
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
+        )
+
+st.sidebar.divider()
 
 # =========================
 # LIMIT DISPLAY
@@ -1071,6 +1086,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
