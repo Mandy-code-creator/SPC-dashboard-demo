@@ -857,47 +857,54 @@ ax.grid(True, linestyle="--", alpha=0.4)
 st.pyplot(fig)
 
 # =========================
+# =========================
 # ΔE DISTRIBUTION
 # =========================
 st.subheader("📈 ΔE Distribution (Per Coil)")
 
 fig2, ax2 = plt.subplots(figsize=(10, 4))
-ax2.hist(df_plot[dE_col], bins=20)
 
-ax2.set_xlabel("ΔE")
-ax2.set_ylabel("Number of Coils")
-ax2.set_title("ΔE Distribution")
-ax2.grid(True, linestyle="--", alpha=0.4)
+# DATA
+data_de = df_plot[dE_col].dropna()
+mean_de = data_de.mean()
+std_de = data_de.std()
 
-st.pyplot(fig2)
+# Histogram (CỘT)
+ax2.hist(
+    data_de,
+    bins=20,
+    density=True,        # ⚠️ BẮT BUỘC để khớp normal curve
+    alpha=0.7,
+    edgecolor="black",
+    label="ΔE Histogram"
+)
+
 # Normal curve (ĐƯỜNG)
-ax.plot(
-    x,
-    y,
+x_de = np.linspace(mean_de - 5*std_de, mean_de + 5*std_de, 1000)
+y_de = (1 / (std_de * np.sqrt(2 * np.pi))) * np.exp(
+    -0.5 * ((x_de - mean_de) / std_de) ** 2
+)
+
+ax2.plot(
+    x_de,
+    y_de,
     linewidth=3,
     label="Normal Distribution"
 )
 
-# Mean & Spec
-ax.axvline(mean, linestyle="--", linewidth=2, label="Mean")
-ax.axvline(LSL, linestyle="--", linewidth=2, label="LSL")
-ax.axvline(USL, linestyle="--", linewidth=2, label="USL")
+# Mean
+ax2.axvline(mean_de, linestyle="--", linewidth=2,
+            label=f"Mean = {mean_de:.2f}")
 
-# Không bị cắt đuôi
-ax.set_xlim(mean - 5*std, mean + 5*std)
+ax2.set_xlabel("ΔE")
+ax2.set_ylabel("Density")
+ax2.set_title("ΔE Distribution")
+ax2.legend()
+ax2.grid(True, linestyle="--", alpha=0.4)
 
-ax.set_xlabel("Thickness")
-ax.set_ylabel("Density")
-ax.legend()
-ax.grid(alpha=0.3)
+# ❗ CHỈ GỌI 1 LẦN
+st.pyplot(fig2)
 
-
-# Mean & Spec
-ax.axvline(mean, linestyle="--", linewidth=2,
-           label=f"Mean = {mean:.2f}")
-
-ax.axvline(LSL, linewidth=2, label="LSL")
-ax.axvline(USL, linewidth=2, label="USL")
 # =========================
 import numpy as np
 import math
@@ -1012,6 +1019,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
