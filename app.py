@@ -162,7 +162,7 @@ def get_control_batch_code(df, control_batch):
           .reset_index(drop=True)
     )
 
-    # batch đầu tiên = 1
+    # ⚠️ batch đầu tiên = 1
     if 1 <= control_batch <= len(batch_order):
         return batch_order.loc[control_batch - 1, "製造批號"]
 
@@ -208,25 +208,28 @@ control_batch_code = get_control_batch_code(df, control_batch)
 
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
-# ===== GET CONTROL BATCH =====
-control_batch = st.sidebar.number_input(
-    "Control batch (Batch#)",
-    min_value=1,
-    step=1
-)
+if control_batch is not None and not df.empty:
 
-control_batch_code = None
-
-control_batch_code = get_control_batch_code(df, control_batch)
-
-if control_batch_code is not None:
-    st.sidebar.info(
-        f"🔔 Control batch\n\n"
-        f"Batch #{control_batch} → {control_batch_code}"
+    batch_order = (
+        df.sort_values("Time")
+          .groupby("製造批號", as_index=False)
+          .first()
+          .reset_index(drop=True)
     )
-else:
-    st.sidebar.warning("⚠ Control batch invalid or not found")
 
+    if 1 <= control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
+
+        st.sidebar.info(
+            f"🔔 **Control batch**\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
+    else:
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
+        )
 
 st.sidebar.divider()
 
@@ -520,68 +523,9 @@ for k in spc:
     control_batch_code
 )
     st.pyplot(fig)
-# =========================
-# Phase II (Monitoring)
-# =========================
-# Phase II (Monitoring)
-# =========================
-st.markdown("## 📊 SPC Phase II (Monitoring)")
+    download(fig, f"COMBINED_{color}_{k}.png")
 
-for k in spc:
 
-    # ===== 1. SORT + TẠO Batch# =====
-    lab_df = spc[k]["lab"].sort_values("Time").reset_index(drop=True)
-    lab_df["Batch#"] = lab_df.index + 1
-
-    line_df = spc[k]["line"].sort_values("Time").reset_index(drop=True)
-    line_df["Batch#"] = line_df.index + 1
-
-    # ===== 2. CẮT TỪ BATCH KIỂM SOÁT =====
-    lab_p2 = lab_df[lab_df["製造批號"] >= control_batch_code]
-    line_p2 = line_df[line_df["製造批號"] >= control_batch_code]
-
-    if lab_p2.empty and line_p2.empty:
-        continue
-
-    # ===== 3. LẤY GIỚI HẠN GỐC (GOOGLE SHEET) =====
-    lab_lim = get_limit(color, k, "LAB")
-    line_lim = get_limit(color, k, "LINE")
-
-    # ===== 4. VẼ BIỂU ĐỒ =====
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    ax.plot(
-        lab_p2["Batch#"],
-        lab_p2["Value"],
-        marker="o",
-        label="LAB"
-    )
-
-    ax.plot(
-        line_p2["Batch#"],
-        line_p2["Value"],
-        marker="s",
-        label="LINE"
-    )
-
-    # ===== 5. GIỚI HẠN KIỂM SOÁT (GIỮ NGUYÊN) =====
-    for lim, ls in [(lab_lim, "-"), (line_lim, "--")]:
-        if lim:
-            ax.axhline(lim["UCL"], linestyle=ls)
-            ax.axhline(lim["LCL"], linestyle=ls)
-            ax.axhline(lim["TARGET"], linestyle=":")
-
-    # ===== 6. LABEL PHASE II =====
-    ax.text(
-        lab_p2["Batch#"].iloc[0],
-        ax.get_ylim()[1],
-        "Phase II",
-        va="top"
-    )
-
-    ax.set_title(f"Phase II – {k}")
-    ax.set_xlabel("Batch")
-    ax.set_ylabel("Value")
 
 # =========================
 # =========================
@@ -1182,16 +1126,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
-
-
-
-
-
-
 
 
 
