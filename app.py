@@ -574,7 +574,8 @@ if control_batch is not None:
             )
 
         # ===== GIỚI HẠN KIỂM SOÁT (GIỮ NGUYÊN) =====
-        if isinstance(lab_lim, dict):
+        # ===== LAB control limits =====
+    if isinstance(lab_lim, dict):
         if lab_lim.get("UCL") is not None:
             ax.axhline(lab_lim["UCL"], linestyle="-", linewidth=1)
         if lab_lim.get("LCL") is not None:
@@ -583,12 +584,12 @@ if control_batch is not None:
             ax.axhline(lab_lim["TARGET"], linestyle=":")
 
 
-        if isinstance(line_lim, dict):
+    # ===== LINE control limits =====
+    if isinstance(line_lim, dict):
         if line_lim.get("UCL") is not None:
             ax.axhline(line_lim["UCL"], linestyle="--", linewidth=1)
         if line_lim.get("LCL") is not None:
             ax.axhline(line_lim["LCL"], linestyle="--", linewidth=1)
-
 
         # ===== NHÃN PHASE II (KIỂU MINITAB) =====
         ax.text(
@@ -1207,6 +1208,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
