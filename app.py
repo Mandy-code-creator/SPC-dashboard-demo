@@ -217,18 +217,16 @@ control_batch = st.sidebar.number_input(
 
 control_batch_code = None
 
-if not batch_order.empty:
-    if 1 <= control_batch <= len(batch_order):
-        control_batch_code = (
-            batch_order.loc[control_batch - 1, "製造批號"]
-        )
+control_batch_code = get_control_batch_code(df, control_batch)
 
-        st.sidebar.info(
-            f"🔔 Control batch\n\n"
-            f"Batch #{control_batch} → {control_batch_code}"
-        )
-    else:
-        st.sidebar.warning("⚠ Control batch out of range")
+if control_batch_code is not None:
+    st.sidebar.info(
+        f"🔔 Control batch\n\n"
+        f"Batch #{control_batch} → {control_batch_code}"
+    )
+else:
+    st.sidebar.warning("⚠ Control batch invalid or not found")
+
 
 st.sidebar.divider()
 
@@ -1207,6 +1205,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
