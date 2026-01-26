@@ -204,7 +204,7 @@ st.sidebar.divider()
 # =========================
 control_batch = get_control_batch(color)
 control_batch_code = get_control_batch_code(df, control_batch)
-st.write("DEBUG control_batch_code =", control_batch_code)
+
 
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
@@ -524,41 +524,7 @@ for k in spc:
 )
     st.pyplot(fig)
     download(fig, f"COMBINED_{color}_{k}.png")
-# =========================
-# SPC PHASE II (SEPARATE CHART)
-# =========================
-# SPC PHASE II (SEPARATE CHART)
-# =========================
-# =========================
-# SPC PHASE II – ADD ON (NO CHANGE TO OLD DESIGN)
-# =========================
-# ===== Phase II SPC (Monitoring only) =====
-st.markdown("## 📊 SPC Phase II (Monitoring)")
-for k in spc:
 
-    lab_df = spc[k]["lab"]
-    line_df = spc[k]["line"]
-
-    # lấy cột giá trị (cột số duy nhất)
-    lab_val_col  = lab_df.select_dtypes(include="number").columns[0]
-    line_val_col = line_df.select_dtypes(include="number").columns[0]
-
-    lab_p2  = lab_df[lab_df["製造批號"] >= control_batch_code]
-    line_p2 = line_df[line_df["製造批號"] >= control_batch_code]
-
-    if lab_p2.empty and line_p2.empty:
-        continue
-
-    fig, ax = plt.subplots(figsize=(12, 4))
-
-    ax.plot(lab_p2.index + 1,  lab_p2[lab_val_col],  "o-", label="LAB")
-    ax.plot(line_p2.index + 1, line_p2[line_val_col], "s-", label="LINE")
-
-    ax.set_title(f"Phase II – {k}")
-    ax.legend()
-    ax.grid(alpha=0.3)
-
-    st.pyplot(fig)
 
 
 # =========================
@@ -1160,18 +1126,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
