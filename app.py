@@ -108,7 +108,18 @@ df.columns = (
     .str.strip()
 )
 # =========================
- # CONTROL BATCH FUNCTION  
+# LIMIT FUNCTION
+# =========================
+def get_limit(color, prefix, factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None, None
+    return (
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
+    )
+
+# CONTROL BATCH FUNCTION  
 def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
 
@@ -201,16 +212,6 @@ show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# LIMIT FUNCTION
-# =========================
-def get_limit(color, prefix, factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None, None
-    return (
-        row.get(f"{factor} {prefix} LCL", [None]).values[0],
-        row.get(f"{factor} {prefix} UCL", [None]).values[0]
-    )
 
 # =========================
 # OUT-OF-CONTROL DETECTION
@@ -1065,6 +1066,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
