@@ -207,6 +207,37 @@ if control_batch is not None and not df.empty:
         how="left"
     )
 
+    # =========================
+# BEFORE / AFTER CONTROL SUMMARY
+# =========================
+if control_batch is not None and "Batch#" in df.columns:
+
+    df_before = df[df["Batch#"] < control_batch]
+    df_after  = df[df["Batch#"] >= control_batch]
+
+    def summary_block(data, label):
+        if data.empty:
+            return {
+                "Period": label,
+                "Mean": None,
+                "Std": None,
+                "n": 0
+            }
+        return {
+            "Period": label,
+            "Mean": round(data["Value"].mean(), 2),
+            "Std": round(data["Value"].std(), 2),
+            "n": int(data["Value"].count())
+        }
+
+    summary_df = pd.DataFrame([
+        summary_block(df_before, "Before Control"),
+        summary_block(df_after,  "After Control")
+    ])
+
+    st.subheader("📊 Before / After Control Summary")
+    st.dataframe(summary_df, use_container_width=True)
+
     # ===== CONTROL BATCH ROW =====
     row_cb = batch_order[batch_order["Batch#"] == control_batch]
 
@@ -1132,6 +1163,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
