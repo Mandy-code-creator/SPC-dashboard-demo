@@ -528,6 +528,50 @@ for k in spc:
     else:
         st.info(f"{k}: Combined chart cannot be generated")
 # ========================= phase 2
+def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
+    if control_batch_code is None:
+        return None
+
+    batch_order = (
+        pd.concat([
+            lab[["製造批號", "Time"]],
+            line[["製造批號", "Time"]]
+        ])
+        .drop_duplicates()
+        .sort_values("Time")
+        .reset_index(drop=True)
+    )
+
+    if control_batch_code not in batch_order["製造批號"].values:
+        return None
+
+    start_idx = batch_order[
+        batch_order["製造批號"] == control_batch_code
+    ].index[0]
+
+    phase2_batches = batch_order.loc[start_idx:, "製造批號"]
+
+    lab2 = lab[lab["製造批號"].isin(phase2_batches)]
+    line2 = line[line["製造批號"].isin(phase2_batches)]
+
+    if lab2.empty or line2.empty:
+        return None
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+
+    ax.plot(lab2["Batch#"], lab2["Value"], marker="o", label="LAB")
+    ax.plot(line2["Batch#"], line2["Value"], marker="s", label="LINE")
+
+    ax.axhline(lab_lim["UCL"], color="red", linestyle="--")
+    ax.axhline(lab_lim["LCL"], color="red", linestyle="--")
+    ax.axhline(lab_lim["CL"], color="black")
+
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True)
+
+    return fig
+# =========================
 st.markdown("---")
 st.subheader("📊 SPC Combined Chart (LAB + LINE) – Phase II")
 for k in ["ΔL", "Δa", "Δb"]:
@@ -1189,6 +1233,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
