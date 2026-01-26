@@ -574,17 +574,16 @@ def download(fig, name):
 # DASHBOARD
 # =========================
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
-for k in spc:
-    fig = spc_combined(
-    spc[k]["lab"],
-    spc[k]["line"],
-    f"COMBINED {k}",
-    get_limit(color, k, "LAB"),
-    get_limit(color, k, "LINE"),
-    control_batch_code
+fig = spc_combined(
+    ...
 )
+
+if fig is not None:
     st.pyplot(fig)
     download(fig, f"COMBINED_{color}_{k}.png")
+else:
+    st.info(f"{k}: Not enough data to generate chart")
+
 
 st.markdown("### 📊 SPC COMBINED – Phase II (From Control Batch)")
 
@@ -1204,6 +1203,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
