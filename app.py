@@ -529,85 +529,26 @@ for k in spc:
 # =========================
 # SPC PHASE II (SEPARATE CHART)
 # =========================
+# =========================
+# SPC PHASE II – ADD ON (NO CHANGE TO OLD DESIGN)
+# =========================
 st.markdown("## 📊 SPC Phase II (Monitoring)")
-st.write("DEBUG control_batch =", control_batch)
 
-if control_batch is not None:
-
+if control_batch_code is not None:
     for k in spc:
-
-        df_lab = spc[k]["lab"].reset_index(drop=True)
-        df_line = spc[k]["line"].reset_index(drop=True)
-
-        # ===== TẠO Batch# TẠM (BẮT ĐẦU TỪ 1) =====
-        df_lab["Batch#"] = df_lab.index + 1
-        df_line["Batch#"] = df_line.index + 1
-
-        # ===== LẤY PHASE II =====
-        lab_p2 = df_lab[df_lab["Batch#"] >= control_batch]
-        line_p2 = df_line[df_line["Batch#"] >= control_batch]
+        lab_p2  = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
+        line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
 
         if lab_p2.empty and line_p2.empty:
             continue
 
-        # ===== GIỚI HẠN GỐC (GOOGLE SHEET) =====
-        lab_lim = get_limit(color, k, "LAB")
-        line_lim = get_limit(color, k, "LINE")
-
-        fig, ax = plt.subplots(figsize=(12, 4))
-
-        # LAB
-        if not lab_p2.empty:
-            ax.plot(
-                lab_p2["Batch#"],
-                lab_p2["value"],
-                marker="o",
-                label="LAB"
-            )
-
-        # LINE
-        if not line_p2.empty:
-            ax.plot(
-                line_p2["Batch#"],
-                line_p2["value"],
-                marker="s",
-                label="LINE"
-            )
-
-        # ===== GIỚI HẠN KIỂM SOÁT (GIỮ NGUYÊN) =====
-        # ===== LAB control limits =====
-    if isinstance(lab_lim, dict):
-        if lab_lim.get("UCL") is not None:
-            ax.axhline(lab_lim["UCL"], linestyle="-", linewidth=1)
-        if lab_lim.get("LCL") is not None:
-            ax.axhline(lab_lim["LCL"], linestyle="-", linewidth=1)
-        if lab_lim.get("TARGET") is not None:
-            ax.axhline(lab_lim["TARGET"], linestyle=":")
-
-
-    # ===== LINE control limits =====
-    if isinstance(line_lim, dict):
-        if line_lim.get("UCL") is not None:
-            ax.axhline(line_lim["UCL"], linestyle="--", linewidth=1)
-        if line_lim.get("LCL") is not None:
-            ax.axhline(line_lim["LCL"], linestyle="--", linewidth=1)
-
-        # ===== NHÃN PHASE II (KIỂU MINITAB) =====
-        ax.text(
-            control_batch,
-            ax.get_ylim()[1],
-            "Phase II",
-            fontsize=9,
-            ha="left",
-            va="top"
+        fig = spc_combined(
+            lab_p2,
+            line_p2,
+            f"Phase II – {k}",
+            get_limit(color, k, "LAB"),
+            get_limit(color, k, "LINE")
         )
-
-        ax.set_title(f"SPC Phase II – {k}")
-        ax.set_xlabel("Batch")
-        ax.set_ylabel("Value")
-        ax.legend()
-        ax.grid(alpha=0.3)
-
         st.pyplot(fig)
 
 # =========================
@@ -1209,6 +1150,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
