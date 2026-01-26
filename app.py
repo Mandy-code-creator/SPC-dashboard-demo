@@ -185,11 +185,11 @@ st.sidebar.divider()
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
+
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
 if control_batch is not None and not df.empty:
 
-    # ===== CREATE BATCH ORDER (START FROM 1) =====
     batch_order = (
         df.sort_values("Time")
           .groupby("製造批號", as_index=False)
@@ -197,22 +197,21 @@ if control_batch is not None and not df.empty:
           .reset_index(drop=True)
     )
 
-    batch_order["Batch#"] = batch_order.index + 1
+    if 1 <= control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
 
-    df = df.merge(
-        batch_order[["製造批號", "Batch#"]],
-        on="製造批號",
-        how="left"
-    )
-
-    # ===== CONTROL BATCH ROW =====
-    row_cb = batch_order[batch_order["Batch#"] == control_batch]
-
-    if not row_cb.empty:
-        control_batch_code = row_cb.iloc[0]["製造批號"]
+        st.sidebar.info(
+            f"🔔 **Control batch**\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
     else:
-        control_batch_code = None
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
+        )
 
+st.sidebar.divider()
 
 # =========================
 # LIMIT DISPLAY
@@ -285,7 +284,6 @@ def prep_lab(df, col):
 # =========================
 # SPC DATA
 # =========================
-# =========================
 spc = {
     "ΔL": {
         "lab": prep_lab(df, "入料檢測 ΔL 正面"),
@@ -300,6 +298,7 @@ spc = {
         "line": prep_spc(df, "正-北 Δb", "正-南 Δb")
     }
 }
+
 # =========================
 # MAIN DASHBOARD
 # =========================
@@ -389,35 +388,9 @@ def spc_combined(lab, line, title, lab_lim, line_lim):
     mean = line["value"].mean()
     std = line["value"].std()
 
-    ax.plot(lab["Batch#"], lab["value"], "o-", label="LAB", color="#1f77b4")
-    ax.plot(line["Batch#"], line["value"], "o-", label="LINE", color="#2ca02c")
-
-    # ===== CONTROL START BATCH =====
-    if control_batch is not None:
-        ax.axvline(
-            x=control_batch,
-            color="red",
-            linestyle="--",
-            linewidth=2,
-            zorder=4
-        )
-
-        ax.text(
-            control_batch + 0.1,
-            ax.get_ylim()[1],
-            f"Control start\nBatch #{control_batch}\n{control_batch_code}",
-            color="red",
-            fontsize=9,
-            verticalalignment="top"
-        )
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-
-    return fig   # ← PHẢI THỤT LỀ 4 SPACE
+    # ===== original lines (GIỮ NGUYÊN) =====
+    ax.plot(lab["製造批號"], lab["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line["製造批號"], line["value"], "o-", label="LINE", color="#2ca02c")
 
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
@@ -1113,10 +1086,6 @@ st.dataframe(
 )
 
 # =========================
-
-
-
-
 
 
 
