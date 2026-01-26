@@ -530,6 +530,7 @@ for k in spc:
 # SPC PHASE II (SEPARATE CHART)
 # =========================
 st.markdown("## 📊 SPC Phase II (Monitoring)")
+st.write("DEBUG control_batch =", control_batch)
 
 if control_batch is not None:
 
@@ -1208,6 +1209,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
