@@ -199,17 +199,22 @@ if control_batch is not None and not df.empty:
           .reset_index(drop=True)
     )
 
-    # Tạo Batch# (BẮT ĐẦU TỪ 1 – KHÔNG BAO GIỜ LÀ 0)
     batch_order["Batch#"] = batch_order.index + 1
 
-    # Gắn Batch# vào df gốc
     df = df.merge(
         batch_order[["製造批號", "Batch#"]],
         on="製造批號",
         how="left"
     )
-st.write("DEBUG Batch order")
-st.write(batch_order.head(10))
+
+    # ===== CONTROL BATCH ROW =====
+    row_cb = batch_order[batch_order["Batch#"] == control_batch]
+
+    if not row_cb.empty:
+        control_batch_code = row_cb.iloc[0]["製造批號"]
+    else:
+        control_batch_code = None
+
     # ===== GET CONTROL BATCH CODE BY Batch# =====
     row_cb = batch_order[batch_order["Batch#"] == control_batch]
 
@@ -1127,6 +1132,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
