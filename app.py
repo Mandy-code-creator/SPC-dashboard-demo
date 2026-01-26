@@ -431,23 +431,6 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
         )
 
 
-    # ===== CONTROL LIMITS (GIỮ NGUYÊN LOGIC) =====
-    if lab_lim[0] is not None:
-        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
-        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
-
-    if line_lim[0] is not None:
-        ax.axhline(line_lim[0], color="red", label="LINE LCL")
-        ax.axhline(line_lim[1], color="red", label="LINE UCL")
-
-    ax.set_title(title)
-    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
-    fig.subplots_adjust(right=0.78)
-
-    return fig
-
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
     y_lab = lab["value"]
@@ -542,7 +525,7 @@ for k in spc:
     st.pyplot(fig)
     download(fig, f"COMBINED_{color}_{k}.png")
 
-# =========================
+
 
 # =========================
 # =========================
@@ -1143,8 +1126,6 @@ st.dataframe(
 )
 
 # =========================
-
-
 
 
 
