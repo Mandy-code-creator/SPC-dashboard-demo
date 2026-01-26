@@ -199,7 +199,15 @@ if control_batch is not None and not df.empty:
           .first()
           .reset_index(drop=True)
     )
+    # Tạo Batch#
+batch_order["Batch#"] = batch_order.index + 1
 
+# Gắn Batch# lại cho df
+df = df.merge(
+    batch_order[["製造批號", "Batch#"]],
+    on="製造批號",
+    how="left"
+)
     # ⭐ QUAN TRỌNG: Batch# BẮT ĐẦU TỪ 1
     batch_order["Batch#"] = batch_order.index + 1
 
@@ -1120,6 +1128,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
