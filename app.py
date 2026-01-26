@@ -204,7 +204,7 @@ st.sidebar.divider()
 # =========================
 control_batch = get_control_batch(color)
 control_batch_code = get_control_batch_code(df, control_batch)
-
+st.write("DEBUG control_batch_code =", control_batch_code)
 
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
@@ -1150,6 +1150,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
