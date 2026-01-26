@@ -523,67 +523,65 @@ for k in spc:
     control_batch_code
 )
     st.pyplot(fig)
-    # =================================================
-# 📊 PHASE II SPC CONTROL CHART (RE-CALCULATED)
-# =================================================
-st.markdown("### 📊 Phase II SPC Control Chart (Re-calculated from Control Batch)")
+# =========================Phase II (Monitoring)
+    st.markdown("## 📊 SPC Phase II (Monitoring)")
 
 for k in spc:
-    if control_batch_code is None:
+
+    # ===== 1. CẮT DỮ LIỆU TỪ BATCH KIỂM SOÁT =====
+    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
+    line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
+
+    if lab_p2.empty and line_p2.empty:
         continue
 
-    # ===== lấy LINE data =====
-    data = spc[k]["line"]
+    # ===== 2. LẤY GIỚI HẠN GỐC (GOOGLE SHEET) =====
+    lab_lim = get_limit(color, k, "LAB")
+    line_lim = get_limit(color, k, "LINE")
 
-    # ===== chỉ lấy Phase II =====
-    phase2 = data[data["製造批號"] >= control_batch_code]
+    # ===== 3. TẠO BIỂU ĐỒ =====
+    fig, ax = plt.subplots(figsize=(12, 4))
 
-    if len(phase2) < 3:
-        continue
-
-    # ===== tính lại control limits từ Phase II =====
-    mean = phase2["value"].mean()
-    std = phase2["value"].std()
-
-    UCL = mean + 3 * std
-    LCL = mean - 3 * std
-
-    fig, ax = plt.subplots(figsize=(12,4))
-
-    # ===== plot Phase II =====
+    # LAB
     ax.plot(
-        phase2["製造批號"],
-        phase2["value"],
-        "o-",
-        color="green",
-        label="Phase II"
+        lab_p2["Batch#"],
+        lab_p2["Value"],
+        marker="o",
+        label="LAB",
+        alpha=0.9
     )
 
-    # ===== control lines (NEW) =====
-    ax.axhline(mean, color="black", linewidth=1.5, label="Phase II Mean")
-    ax.axhline(UCL, color="red", linestyle="--", label="Phase II UCL")
-    ax.axhline(LCL, color="red", linestyle="--", label="Phase II LCL")
-
-    # ===== SPC rule (Phase II only) =====
-    ooc = detect_out_of_control(
-        phase2,   # ⚠️ CHỈ PHASE II
-        LCL,
-        UCL
+    # LINE
+    ax.plot(
+        line_p2["Batch#"],
+        line_p2["Value"],
+        marker="s",
+        label="LINE",
+        alpha=0.9
     )
 
-    ax.scatter(
-        ooc["製造批號"],
-        ooc["value"],
-        color="red",
-        s=80,
-        zorder=5,
-        label="Out of Control"
+    # ===== 4. VẼ GIỚI HẠN (GIỮ NGUYÊN) =====
+    for lim, ls in [(lab_lim, "-"), (line_lim, "--")]:
+        if lim:
+            ax.axhline(lim["UCL"], linestyle=ls, linewidth=1)
+            ax.axhline(lim["LCL"], linestyle=ls, linewidth=1)
+            ax.axhline(lim["TARGET"], linestyle=":")
+
+    # ===== 5. VẠCH PHASE II (KIỂU MINITAB) =====
+    ax.text(
+        lab_p2["Batch#"].iloc[0],
+        ax.get_ylim()[1],
+        "Phase II",
+        fontsize=10,
+        verticalalignment="top"
     )
 
-    ax.set_title(f"{k} – Phase II SPC Chart")
+    # ===== 6. FORMAT =====
+    ax.set_title(f"Phase II – {k}")
+    ax.set_xlabel("Batch")
+    ax.set_ylabel("Value")
     ax.legend()
-    ax.grid(True)
-    ax.tick_params(axis="x", rotation=45)
+    ax.grid(alpha=0.3)
 
     st.pyplot(fig)
 
@@ -1190,6 +1188,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
