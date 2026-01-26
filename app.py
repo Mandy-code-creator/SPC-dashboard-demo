@@ -171,8 +171,8 @@ st.sidebar.divider()
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-# 🔍 DEBUG (tạm thời)
-st.sidebar.write("DEBUG control_batch =", control_batch)
+# 🔍 DEBUG – ĐẶT NGAY TẠI ĐÂY
+st.sidebar.write("DEBUG Control_batch =", control_batch)
 if control_batch is not None and not df.empty:
 
     batch_order = (
@@ -1071,36 +1071,6 @@ st.dataframe(
 )
 
 # =========================
-# BATCH SUMMARY (END OF APP)
-# =========================
-st.divider()
-st.subheader("📋 Batch Summary (Time Order)")
-
-if df.empty:
-    st.info("No data after filter")
-else:
-    batch_summary = (
-        df.sort_values("Time")
-          .groupby("製造批號")
-          .agg(
-              LAB_Mean=("LAB ΔE", "mean"),     # đổi đúng tên cột
-              LINE_Mean=("LINE ΔE", "mean"),
-              First_Time=("Time", "min")
-          )
-          .reset_index()
-          .sort_values("First_Time")
-          .reset_index(drop=True)
-    )
-
-    batch_summary.insert(0, "Batch#", batch_summary.index + 1)
-
-    batch_summary["LAB_Mean"] = batch_summary["LAB_Mean"].round(2)
-    batch_summary["LINE_Mean"] = batch_summary["LINE_Mean"].round(2)
-
-    st.dataframe(
-        batch_summary[["Batch#", "製造批號", "LAB_Mean", "LINE_Mean"]],
-        use_container_width=True
-    )
 
 
 
