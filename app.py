@@ -575,7 +575,12 @@ def download(fig, name):
 # =========================
 st.markdown("### 📊 CONTROL CHART: LAB-LINE")
 fig = spc_combined(
-    ...
+    spc[k]["lab"],
+    spc[k]["line"],
+    f"COMBINED {k}",
+    get_limit(color, k, "LAB"),
+    get_limit(color, k, "LINE"),
+    control_batch_code
 )
 
 if fig is not None:
@@ -1203,6 +1208,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
