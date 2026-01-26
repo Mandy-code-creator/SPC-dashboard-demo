@@ -469,7 +469,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
 # =========================phase 2 chart
     def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
 
-    if control_batch_code is None:
+        if control_batch_code is None:
         return None
 
     # ===== chỉ lấy Phase II =====
@@ -1192,6 +1192,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
