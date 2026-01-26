@@ -161,6 +161,7 @@ def get_control_batch_code(df, control_batch):
           .first()
           .reset_index(drop=True)
     )
+st.write("batch_order columns:", batch_order.columns.tolist())
 
     # ⚠️ batch đầu tiên = 1
     if 1 <= control_batch <= len(batch_order):
@@ -1208,6 +1209,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
