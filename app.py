@@ -532,24 +532,6 @@ for k in spc:
 # =========================
 # SPC PHASE II – ADD ON (NO CHANGE TO OLD DESIGN)
 # =========================
-st.markdown("## 📊 SPC Phase II (Monitoring)")
-
-if control_batch_code is not None:
-    for k in spc:
-        lab_p2  = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
-        line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
-
-        if lab_p2.empty and line_p2.empty:
-            continue
-
-        fig = spc_combined(
-            lab_p2,
-            line_p2,
-            f"Phase II – {k}",
-            get_limit(color, k, "LAB"),
-            get_limit(color, k, "LINE")
-        )
-        st.pyplot(fig)
 # ===== Phase II SPC (Monitoring only) =====
 st.markdown("## 📊 SPC Phase II (Monitoring)")
 
@@ -1169,6 +1151,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
