@@ -423,16 +423,15 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
 
         # ===== label text for control batch =====
         ax.text(
-            control_batch_code,
-            ax.get_ylim()[1],          # đặt chữ ở mép trên biểu đồ
-            "⬅ Control batch start",
-            color="red",
-            fontsize=10,
-            rotation=90,
-            verticalalignment="top",
-            horizontalalignment="right",
-            backgroundcolor="white"
-        )
+    control_batch_code,
+    ax.get_ylim()[1] * 0.98,
+    "Start control",
+    color="red",
+    fontsize=9,
+    ha="center",
+    va="top"
+)
+
 
     # ===== highlight LAB out-of-limit =====
     x_lab = lab["製造批號"]
@@ -1129,6 +1128,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
