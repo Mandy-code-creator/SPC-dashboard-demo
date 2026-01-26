@@ -195,22 +195,21 @@ def get_limit(color, prefix, factor):
         row.get(f"{factor} {prefix} UCL", [None]).values[0]
     )
  # CONTROL BATCH FUNCTION  
-    def get_control_batch(color):
-        row = limit_df[limit_df["Color_code"] == color]
+def get_control_batch(color):
+    row = limit_df[limit_df["Color_code"] == color]
 
-        if row.empty:
+    if row.empty:
         return None
 
-        value = row["Control_batch"].values[0]
+    value = row["Control_batch"].values[0]
 
-        if pd.isna(value):
+    if pd.isna(value):
         return None
 
-        try:
+    try:
         return int(float(value))
-        except:
+    except:
         return None
-
 
 # =========================
 # OUT-OF-CONTROL DETECTION
@@ -1065,6 +1064,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
