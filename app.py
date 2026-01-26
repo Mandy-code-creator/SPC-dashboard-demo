@@ -523,32 +523,23 @@ for k in spc:
 # =========================
 # Phase II (Monitoring)
 # =========================
+# Phase II (Monitoring)
+# =========================
 st.markdown("## 📊 SPC Phase II (Monitoring)")
 
 for k in spc:
 
-    # ===== 1. MERGE + CẮT DỮ LIỆU TỪ BATCH KIỂM SOÁT =====
-    lab_p2 = (
-        spc[k]["lab"]
-        .merge(
-            batch_order[["製造批號", "Batch#"]],
-            on="製造批號",
-            how="left"
-        )
-    )
-    lab_p2 = lab_p2[lab_p2["製造批號"] >= control_batch_code]
+    # ===== 1. SORT + TẠO Batch# =====
+    lab_df = spc[k]["lab"].sort_values("Time").reset_index(drop=True)
+    lab_df["Batch#"] = lab_df.index + 1
 
-    line_p2 = (
-        spc[k]["line"]
-        .merge(
-            batch_order[["製造批號", "Batch#"]],
-            on="製造批號",
-            how="left"
-        )
-    )
-    line_p2 = line_p2[line_p2["製造批號"] >= control_batch_code]
+    line_df = spc[k]["line"].sort_values("Time").reset_index(drop=True)
+    line_df["Batch#"] = line_df.index + 1
 
-    # ===== 2. CHECK DATA =====
+    # ===== 2. CẮT TỪ BATCH KIỂM SOÁT =====
+    lab_p2 = lab_df[lab_df["製造批號"] >= control_batch_code]
+    line_p2 = line_df[line_df["製造批號"] >= control_batch_code]
+
     if lab_p2.empty and line_p2.empty:
         continue
 
@@ -556,55 +547,41 @@ for k in spc:
     lab_lim = get_limit(color, k, "LAB")
     line_lim = get_limit(color, k, "LINE")
 
-    # ===== 4. TẠO BIỂU ĐỒ =====
+    # ===== 4. VẼ BIỂU ĐỒ =====
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    # LAB
     ax.plot(
         lab_p2["Batch#"],
         lab_p2["Value"],
         marker="o",
-        label="LAB",
-        alpha=0.9
+        label="LAB"
     )
 
-    # LINE
     ax.plot(
         line_p2["Batch#"],
         line_p2["Value"],
         marker="s",
-        label="LINE",
-        alpha=0.9
+        label="LINE"
     )
 
-    # ===== 5. VẼ GIỚI HẠN (GIỮ NGUYÊN) =====
+    # ===== 5. GIỚI HẠN KIỂM SOÁT (GIỮ NGUYÊN) =====
     for lim, ls in [(lab_lim, "-"), (line_lim, "--")]:
         if lim:
-            ax.axhline(lim["UCL"], linestyle=ls, linewidth=1)
-            ax.axhline(lim["LCL"], linestyle=ls, linewidth=1)
+            ax.axhline(lim["UCL"], linestyle=ls)
+            ax.axhline(lim["LCL"], linestyle=ls)
             ax.axhline(lim["TARGET"], linestyle=":")
 
-    # ===== 6. LABEL PHASE II (KIỂU MINITAB) =====
+    # ===== 6. LABEL PHASE II =====
     ax.text(
         lab_p2["Batch#"].iloc[0],
         ax.get_ylim()[1],
         "Phase II",
-        fontsize=10,
-        verticalalignment="top"
+        va="top"
     )
 
-    # ===== 7. FORMAT =====
     ax.set_title(f"Phase II – {k}")
     ax.set_xlabel("Batch")
     ax.set_ylabel("Value")
-    ax.legend()
-    ax.grid(alpha=0.3)
-
-    st.pypl
-
-    download(fig, f"COMBINED_{color}_{k}.png")
-
-
 
 # =========================
 # =========================
@@ -1205,6 +1182,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
