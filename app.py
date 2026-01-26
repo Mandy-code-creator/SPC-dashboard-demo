@@ -544,8 +544,9 @@ for k in spc:
         continue
 
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(lab_p2["Batch#"], lab_p2["Value"], "o-", label="LAB")
-    ax.plot(line_p2["Batch#"], line_p2["Value"], "s-", label="LINE")
+      ax.plot(lab_p2.index + 1, lab_p2["Value"], "o-", label="LAB")
+    
+      ax.plot(line_p2.index + 1, line_p2["Value"], "s-", label="LINE")
 
     for lim in [get_limit(color, k, "LAB"), get_limit(color, k, "LINE")]:
         if lim:
@@ -1153,6 +1154,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
