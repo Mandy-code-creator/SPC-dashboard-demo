@@ -209,28 +209,27 @@ control_batch_code = get_control_batch_code(df, control_batch)
 
 st.sidebar.write("DEBUG Control_batch =", control_batch)
 
-if control_batch is not None and not df.empty:
+# ===== GET CONTROL BATCH =====
+control_batch = st.sidebar.number_input(
+    "Control batch (Batch#)",
+    min_value=1,
+    step=1
+)
 
-    batch_order = (
-        df.sort_values("Time")
-          .groupby("製造批號", as_index=False)
-          .first()
-          .reset_index(drop=True)
-    )
+control_batch_code = None
 
+if not batch_order.empty:
     if 1 <= control_batch <= len(batch_order):
-        control_batch_code = batch_order.loc[
-            control_batch - 1, "製造批號"
-        ]
+        control_batch_code = (
+            batch_order.loc[control_batch - 1, "製造批號"]
+        )
 
         st.sidebar.info(
-            f"🔔 **Control batch**\n\n"
-            f"Batch #{control_batch} → **{control_batch_code}**"
+            f"🔔 Control batch\n\n"
+            f"Batch #{control_batch} → {control_batch_code}"
         )
     else:
-        st.sidebar.warning(
-            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
-        )
+        st.sidebar.warning("⚠ Control batch out of range")
 
 st.sidebar.divider()
 
@@ -1209,6 +1208,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
