@@ -196,7 +196,7 @@ def get_control_batch(color):
     row = limit_df[limit_df["Color_code"] == color]
     if row.empty:
         return None
-    return row["Control_batch"].values[0]
+    return int(row["Control_batch"].values[0])
 
 # =========================
 # OUT-OF-CONTROL DETECTION
@@ -1052,6 +1052,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
