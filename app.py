@@ -550,6 +550,25 @@ if control_batch_code is not None:
             get_limit(color, k, "LINE")
         )
         st.pyplot(fig)
+# ===== Phase II SPC (Monitoring only) =====
+st.markdown("## 📊 SPC Phase II (Monitoring)")
+
+for k in spc:
+    lab_p2  = spc[k]["lab"][spc[k]["lab"]["Batch#"] >= control_batch]
+    line_p2 = spc[k]["line"][spc[k]["line"]["Batch#"] >= control_batch]
+    if lab_p2.empty and line_p2.empty:
+        continue
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(lab_p2["Batch#"], lab_p2["Value"], "o-", label="LAB")
+    ax.plot(line_p2["Batch#"], line_p2["Value"], "s-", label="LINE")
+
+    for lim in [get_limit(color, k, "LAB"), get_limit(color, k, "LINE")]:
+        if lim:
+            ax.axhline(lim["UCL"]); ax.axhline(lim["LCL"]); ax.axhline(lim["TARGET"], ls=":")
+
+    ax.set_title(f"Phase II – {k}"); ax.legend(); ax.grid(alpha=0.3)
+    st.pyplot(fig)
 
 # =========================
 # =========================
@@ -1150,6 +1169,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
