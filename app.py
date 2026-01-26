@@ -194,6 +194,35 @@ if control_batch is not None and not df.empty:
         )
 
 st.sidebar.divider()
+# =========================
+# CONTROL BATCH INFO (SIDEBAR)
+# =========================
+control_batch = get_control_batch(color)
+
+if control_batch is not None and not df.empty:
+
+    batch_order = (
+        df.sort_values("Time")
+          .groupby("製造批號", as_index=False)
+          .first()
+          .reset_index(drop=True)
+    )
+
+    if 1 <= control_batch <= len(batch_order):
+        control_batch_code = batch_order.loc[
+            control_batch - 1, "製造批號"
+        ]
+
+        st.sidebar.info(
+            f"🔔 **Control start batch**\n\n"
+            f"Batch #{control_batch} → **{control_batch_code}**"
+        )
+    else:
+        st.sidebar.warning(
+            f"⚠ Control batch #{control_batch} vượt quá số batch hiện có"
+        )
+
+st.sidebar.divider()
 
 # =========================
 # LIMIT DISPLAY
@@ -1066,6 +1095,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
