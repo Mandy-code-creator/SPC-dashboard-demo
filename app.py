@@ -428,7 +428,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     "Start control",
     color="red",
     fontsize=9,
-    ha="center",
+    ha="right",
     va="top"
 )
 
@@ -1128,6 +1128,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
