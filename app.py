@@ -523,6 +523,70 @@ for k in spc:
     control_batch_code
 )
     st.pyplot(fig)
+    # =================================================
+# 📊 PHASE II SPC CONTROL CHART (RE-CALCULATED)
+# =================================================
+st.markdown("### 📊 Phase II SPC Control Chart (Re-calculated from Control Batch)")
+
+for k in spc:
+    if control_batch_code is None:
+        continue
+
+    # ===== lấy LINE data =====
+    data = spc[k]["line"]
+
+    # ===== chỉ lấy Phase II =====
+    phase2 = data[data["製造批號"] >= control_batch_code]
+
+    if len(phase2) < 3:
+        continue
+
+    # ===== tính lại control limits từ Phase II =====
+    mean = phase2["value"].mean()
+    std = phase2["value"].std()
+
+    UCL = mean + 3 * std
+    LCL = mean - 3 * std
+
+    fig, ax = plt.subplots(figsize=(12,4))
+
+    # ===== plot Phase II =====
+    ax.plot(
+        phase2["製造批號"],
+        phase2["value"],
+        "o-",
+        color="green",
+        label="Phase II"
+    )
+
+    # ===== control lines (NEW) =====
+    ax.axhline(mean, color="black", linewidth=1.5, label="Phase II Mean")
+    ax.axhline(UCL, color="red", linestyle="--", label="Phase II UCL")
+    ax.axhline(LCL, color="red", linestyle="--", label="Phase II LCL")
+
+    # ===== SPC rule (Phase II only) =====
+    ooc = detect_out_of_control(
+        phase2,   # ⚠️ CHỈ PHASE II
+        LCL,
+        UCL
+    )
+
+    ax.scatter(
+        ooc["製造批號"],
+        ooc["value"],
+        color="red",
+        s=80,
+        zorder=5,
+        label="Out of Control"
+    )
+
+    ax.set_title(f"{k} – Phase II SPC Chart")
+    ax.legend()
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+
+    st.pyplot(fig)
+
     download(fig, f"COMBINED_{color}_{k}.png")
 
 
@@ -1126,6 +1190,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
