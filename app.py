@@ -467,9 +467,13 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
 
     return fig
 # =========================phase 2 chart
-    def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
+ def spc_combined_phase2(
+    lab, line, title,
+    lab_lim, line_lim,
+    control_batch_code
+):
 
-        if control_batch_code is None:
+    if control_batch_code is None:
         return None
 
     # ===== chỉ lấy Phase II =====
@@ -483,10 +487,16 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
 
     # ===== LAB & LINE =====
     if not lab2.empty:
-        ax.plot(lab2["製造批號"], lab2["value"], "o-", label="LAB", color="#1f77b4")
+        ax.plot(
+            lab2["製造批號"], lab2["value"],
+            "o-", label="LAB", color="#1f77b4"
+        )
 
     if not line2.empty:
-        ax.plot(line2["製造批號"], line2["value"], "o-", label="LINE", color="#2ca02c")
+        ax.plot(
+            line2["製造批號"], line2["value"],
+            "o-", label="LINE", color="#2ca02c"
+        )
 
     # ===== Phase II marker =====
     ax.axvline(
@@ -513,6 +523,7 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
     fig.subplots_adjust(right=0.78)
 
     return fig
+
 # =========================
 
 def spc_single(spc, title, limit, color):
@@ -1192,6 +1203,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
