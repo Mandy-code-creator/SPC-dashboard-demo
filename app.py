@@ -875,40 +875,61 @@ st.pyplot(fig2)
 import numpy as np
 import math
 
-st.subheader("📊 Average Thickness Distribution (Normal Curve + Spec)")
+st.subheader("📊 Average Thickness Distribution (Histogram + Normal Curve)")
 
-# ---- SPEC INPUT ----
+# =========================
+# DATA
+# =========================
+data = df_plot[thickness_col].dropna()
+
+mean = data.mean()
+std = data.std()
+
+# =========================
+# SPEC INPUT
+# =========================
 col1, col2 = st.columns(2)
 
 with col1:
     LSL = st.number_input(
         "LSL (Lower Spec Limit)",
-        value=float(df_plot[thickness_col].mean() - 1.0)
+        value=float(mean - 3*std)
     )
 
 with col2:
     USL = st.number_input(
         "USL (Upper Spec Limit)",
-        value=float(df_plot[thickness_col].mean() + 1.0)
+        value=float(mean + 3*std)
     )
 
 if LSL >= USL:
     st.error("❌ LSL must be smaller than USL")
     st.stop()
 
-# ---- DATA ----
-data = df_plot[thickness_col].dropna()
-
-mean = data.mean()
-std = data.std()
-
-# ---- NORMAL PDF (NO SCIPY) ----
+# =========================
+# NORMAL CURVE (NO SCIPY, LONG TAIL)
+# =========================
 x = np.linspace(mean - 5*std, mean + 5*std, 1000)
 y = (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
     -0.5 * ((x - mean) / std) ** 2
 )
 
-# Normal curve
+# =========================
+# PLOT
+# =========================
+fig, ax = plt.subplots(figsize=(10, 4))
+
+# Histogram (CỘT)
+ax.hist(
+    data,
+    bins=20,
+    density=True,
+    alpha=0.7,
+    edgecolor="black",
+    label="Thickness Histogram"
+)
+
+# Normal curve (ĐƯỜNG)
 ax.plot(
     x,
     y,
@@ -916,9 +937,20 @@ ax.plot(
     label="Normal Distribution"
 )
 
+# Mean & Spec
+ax.axvline(mean, linestyle="--", linewidth=2, label="Mean")
+ax.axvline(LSL, linestyle="--", linewidth=2, label="LSL")
+ax.axvline(USL, linestyle="--", linewidth=2, label="USL")
+
+# Không bị cắt đuôi
 ax.set_xlim(mean - 5*std, mean + 5*std)
 
+ax.set_xlabel("Thickness")
+ax.set_ylabel("Density")
+ax.legend()
+ax.grid(alpha=0.3)
 
+st.pyplot(fig)
 # Mean & Spec
 ax.axvline(mean, linestyle="--", linewidth=2,
            label=f"Mean = {mean:.2f}")
@@ -953,6 +985,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
