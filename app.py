@@ -582,12 +582,8 @@ fig = spc_combined(
     get_limit(color, k, "LINE"),
     control_batch_code
 )
-
-if fig is not None:
-    st.pyplot(fig)
-    download(fig, f"COMBINED_{color}_{k}.png")
-else:
-    st.info(f"{k}: Not enough data to generate chart")
+st.pyplot(fig)
+download(fig, f"COMBINED_{color}_{k}.png")
 
 
 st.markdown("### 📊 SPC COMBINED – Phase II (From Control Batch)")
@@ -1208,6 +1204,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
