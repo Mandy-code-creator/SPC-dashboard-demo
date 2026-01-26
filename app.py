@@ -950,7 +950,7 @@ ax.set_ylabel("Density")
 ax.legend()
 ax.grid(alpha=0.3)
 
-st.pyplot(fig)
+
 # Mean & Spec
 ax.axvline(mean, linestyle="--", linewidth=2,
            label=f"Mean = {mean:.2f}")
@@ -985,6 +985,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
