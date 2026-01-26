@@ -536,23 +536,25 @@ for k in spc:
 st.markdown("## 📊 SPC Phase II (Monitoring)")
 
 for k in spc:
-    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
 
+    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
     line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
 
     if lab_p2.empty and line_p2.empty:
         continue
 
     fig, ax = plt.subplots(figsize=(12, 4))
-      ax.plot(lab_p2.index + 1, lab_p2["Value"], "o-", label="LAB")
-    
-      ax.plot(line_p2.index + 1, line_p2["Value"], "s-", label="LINE")
 
-    for lim in [get_limit(color, k, "LAB"), get_limit(color, k, "LINE")]:
-        if lim:
-            ax.axhline(lim["UCL"]); ax.axhline(lim["LCL"]); ax.axhline(lim["TARGET"], ls=":")
+    # LAB
+    ax.plot(lab_p2.index + 1, lab_p2["Value"], "o-", label="LAB")
 
-    ax.set_title(f"Phase II – {k}"); ax.legend(); ax.grid(alpha=0.3)
+    # LINE
+    ax.plot(line_p2.index + 1, line_p2["Value"], "s-", label="LINE")
+
+    ax.set_title(f"Phase II – {k}")
+    ax.legend()
+    ax.grid(alpha=0.3)
+
     st.pyplot(fig)
 
 # =========================
@@ -1154,6 +1156,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
