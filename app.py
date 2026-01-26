@@ -1233,105 +1233,173 @@ st.dataframe(
 # ==========================================================
 # 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
 # ==========================================================
-# ==========================================================
-# 🔬 PHASE II – THICKNESS CORRELATION (INDEPENDENT MODULE)
-#    Phase II determined by 製造批號 + Time
-# ==========================================================
-
+# ======================================================
+# 📐 SPC + THICKNESS CORRELATION (PHASE II – PER COIL)
+# ======================================================
 st.markdown("---")
-st.markdown("## 🔬 Phase II – Thickness Correlation")
+st.header("📐 SPC + Thickness Correlation (Phase II – Per Coil)")
 
-THICK_COL = "Avergage Thickness"   # tên cột độ dày thật
+# =========================
+# COLUMN DEFINITIONS
+# =========================
+COLOR_COL = "塗料編號"
+BATCH_COL = "製造批號"
+COIL_COL  = "Coil No."
+THICK_COL = "Avergage Thickness"
 
-show_thickness = st.checkbox(
-    "Show Thickness vs Color correlation (Phase II only)",
-    value=False
+COLOR_FACTORS = {
+    "ΔL": ["入料檢測 ΔL 正面", "Average value ΔL 正面"],
+    "Δa": ["入料檢測 Δa 正面", "Average value Δa 正面"],
+    "Δb": ["入料檢測 Δb 正面", "Average value Δb 正面"],
+    "ΔE": ["Average value ΔE 正面"]
+}
+
+# =========================
+# BASIC CHECK
+# =========================
+required = [COLOR_COL, BATCH_COL, COIL_COL, THICK_COL]
+missing = [c for c in required if c not in df.columns]
+
+if missing:
+    st.warning(f"⚠ Missing required columns: {missing}")
+    st.stop()
+
+if control_batch_code is None:
+    st.warning("⚠ Control batch not defined. Phase II cannot be determined.")
+    st.stop()
+
+# =========================
+# PHASE II + COLOR FILTER
+# =========================
+df_p2 = df.copy()
+df_p2 = df_p2[df_p2[BATCH_COL] >= control_batch_code]
+df_p2 = df_p2[df_p2[COLOR_COL] == color]
+
+if df_p2.empty:
+    st.warning("⚠ No Phase II data after filtering")
+    st.stop()
+
+# =========================
+# FIND AVAILABLE COLOR FACTORS
+# =========================
+available_factors = {}
+
+for k, cols in COLOR_FACTORS.items():
+    for c in cols:
+        if c in df_p2.columns:
+            available_factors[k] = c
+            break
+
+if not available_factors:
+    st.warning("⚠ No color factor columns found")
+    st.stop()
+
+# =========================
+# SELECT FACTOR
+# =========================
+factor_label = st.selectbox(
+    "🎯 Select Color Factor",
+    list(available_factors.keys()),
+    index=0
 )
 
-if show_thickness:
+factor_col = available_factors[factor_label]
 
-    # ===== SAFETY CHECK =====
-    required_cols = {"製造批號", "Time", THICK_COL}
-    missing = required_cols - set(df.columns)
+# =========================
+# AGGREGATE PER COIL
+# =========================
+coil_df = (
+    df_p2
+    .groupby(COIL_COL, as_index=False)
+    .agg({
+        THICK_COL: "mean",
+        factor_col: "mean",
+        BATCH_COL: "min"
+    })
+    .dropna()
+)
 
-    if control_batch is None:
-        st.warning("⚠ Control batch not defined.")
+if coil_df.empty:
+    st.warning("⚠ No valid coil-level data")
+    st.stop()
 
-    elif missing:
-        st.warning(f"⚠ Missing columns: {', '.join(missing)}")
+# =========================
+# OOC BY SPC LIMIT (LINE)
+# =========================
+lcl, ucl = get_limit(color, factor_label, "LINE")
 
-    else:
-        # ===== FIND CONTROL BATCH TIME =====
-        control_code = control_batch_code   # đã tồn tại ở app phía trên
+if lcl is not None and ucl is not None:
+    ooc_mask = (
+        (coil_df[factor_col] < lcl) |
+        (coil_df[factor_col] > ucl)
+    )
+else:
+    ooc_mask = np.zeros(len(coil_df), dtype=bool)
 
-        ctrl_rows = df[df["製造批號"] == control_code]
+normal_df = coil_df[~ooc_mask]
+ooc_df = coil_df[ooc_mask]
 
-        if ctrl_rows.empty:
-            st.warning("⚠ Control batch not found in data.")
-        else:
-            control_time = ctrl_rows["Time"].min()
+# =========================
+# CORRELATION
+# =========================
+corr = coil_df[THICK_COL].corr(coil_df[factor_col])
 
-            # ===== PHASE II DATA (BY TIME) =====
-            df_p2 = df[df["Time"] > control_time].copy()
+# =========================
+# PLOT
+# =========================
+fig, ax = plt.subplots(figsize=(9, 6))
 
-            if df_p2.empty:
-                st.info("ℹ No Phase II data available.")
-            else:
-                # ===== OUT-OF-CONTROL FLAG (READ ONLY) =====
-                if "ooc_df" in globals() and not ooc_df.empty:
-                    ooc_batches = set(ooc_df["製造批號"])
-                    df_p2["OOC"] = df_p2["製造批號"].isin(ooc_batches)
-                else:
-                    df_p2["OOC"] = False
+if not normal_df.empty:
+    ax.scatter(
+        normal_df[THICK_COL],
+        normal_df[factor_col],
+        alpha=0.7,
+        label="Normal Coil"
+    )
 
-                # ===== SELECT COLOR FACTOR =====
-                factors = [c for c in ["ΔL", "Δa", "Δb", "ΔE"] if c in df_p2.columns]
+if not ooc_df.empty:
+    ax.scatter(
+        ooc_df[THICK_COL],
+        ooc_df[factor_col],
+        color="red",
+        s=80,
+        label="OOC Coil"
+    )
 
-                if not factors:
-                    st.warning("⚠ No color factor columns found.")
-                else:
-                    factor = st.selectbox(
-                        "Select Color Factor",
-                        factors,
-                        index=2 if "Δb" in factors else 0
-                    )
+ax.set_xlabel("Average Thickness (per Coil)")
+ax.set_ylabel(factor_label)
+ax.set_title(
+    f"Phase II – Per Coil Analysis\n"
+    f"Thickness vs {factor_label} | r = {corr:.3f}"
+)
 
-                    # ===== SCATTER PLOT =====
-                    fig, ax = plt.subplots()
+ax.legend()
+ax.grid(True, linestyle="--", alpha=0.4)
 
-                    normal = df_p2[~df_p2["OOC"]]
-                    ooc = df_p2[df_p2["OOC"]]
+st.pyplot(fig)
 
-                    ax.scatter(
-                        normal[THICK_COL],
-                        normal[factor],
-                        label="Normal"
-                    )
+# =========================
+# INTERPRETATION
+# =========================
+st.markdown("### 🧠 Interpretation")
 
-                    ax.scatter(
-                        ooc[THICK_COL],
-                        ooc[factor],
-                        label="Out-of-Control"
-                    )
+if abs(corr) >= 0.7:
+    st.error("🔴 Strong correlation → Thickness is very likely a key driver")
+elif abs(corr) >= 0.4:
+    st.warning("🟠 Moderate correlation → Thickness may influence color variation")
+else:
+    st.success("🟢 Weak correlation → Thickness unlikely main cause")
 
-                    ax.set_xlabel(THICK_COL)
-                    ax.set_ylabel(factor)
-                    ax.set_title(f"Phase II: {THICK_COL} vs {factor}")
+# =========================
+# DATA TABLE
+# =========================
+with st.expander("📋 Phase II – Coil level data"):
+    st.dataframe(
+        coil_df.sort_values(BATCH_COL),
+        use_container_width=True
+    )
 
-                    ax.legend()
-                    st.pyplot(fig)
 
-                    # ===== CORRELATION METRIC =====
-                    valid = df_p2[[THICK_COL, factor]].dropna()
-
-                    if len(valid) > 2:
-                        corr = valid[THICK_COL].corr(valid[factor])
-                        st.metric(
-                            f"{THICK_COL} – {factor} Correlation (Phase II)",
-                            f"{corr:.2f}"
-                        )
-                    else:
-                        st.info("ℹ Not enough data to calculate correlation.")
 
 
 
