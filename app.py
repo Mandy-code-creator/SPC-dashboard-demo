@@ -536,8 +536,10 @@ for k in spc:
 st.markdown("## 📊 SPC Phase II (Monitoring)")
 
 for k in spc:
-    lab_p2  = spc[k]["lab"][spc[k]["lab"]["Batch#"] >= control_batch]
-    line_p2 = spc[k]["line"][spc[k]["line"]["Batch#"] >= control_batch]
+    lab_p2 = spc[k]["lab"][spc[k]["lab"]["製造批號"] >= control_batch_code]
+
+    line_p2 = spc[k]["line"][spc[k]["line"]["製造批號"] >= control_batch_code]
+
     if lab_p2.empty and line_p2.empty:
         continue
 
@@ -1151,6 +1153,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
