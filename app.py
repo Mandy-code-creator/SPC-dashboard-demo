@@ -168,13 +168,14 @@ st.sidebar.divider()
 # =========================
 
 # =========================
+# =========================
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
 control_batch = get_control_batch(color)
-# 🔍 DEBUG – ĐẶT NGAY TẠI ĐÂY
-st.sidebar.write("DEBUG Control_batch =", control_batch)
+
 if control_batch is not None and not df.empty:
 
+    # SẮP XẾP BATCH THEO TIME – GIỐNG BIỂU ĐỒ COMBINED
     batch_order = (
         df.sort_values("Time")
           .groupby("製造批號", as_index=False)
@@ -188,7 +189,7 @@ if control_batch is not None and not df.empty:
         ]
 
         st.sidebar.info(
-            f"🔔 **Control start batch**\n\n"
+            f"🔔 **Control batch**\n\n"
             f"Batch #{control_batch} → **{control_batch_code}**"
         )
     else:
@@ -197,6 +198,7 @@ if control_batch is not None and not df.empty:
         )
 
 st.sidebar.divider()
+
 
 # =========================
 # LIMIT DISPLAY
@@ -1071,6 +1073,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
