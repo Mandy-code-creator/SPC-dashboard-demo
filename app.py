@@ -107,7 +107,23 @@ df.columns = (
     .str.replace(r"\s+", " ", regex=True)
     .str.strip()
 )
+# LIMIT FUNCTION
+# =========================
+def get_limit(color, prefix, factor):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None, None
+    return (
+        row.get(f"{factor} {prefix} LCL", [None]).values[0],
+        row.get(f"{factor} {prefix} UCL", [None]).values[0]
+    )
+def get_control_batch(color):
+    row = limit_df[limit_df["Color_code"] == color]
+    if row.empty:
+        return None
+    return int(row["Control_batch"].values[0])
 
+# =========================
 # =========================
 # SIDEBAR – FILTER
 # =========================
@@ -182,23 +198,7 @@ show_limits("LAB")
 show_limits("LINE")
 
 # =========================
-# LIMIT FUNCTION
-# =========================
-def get_limit(color, prefix, factor):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None, None
-    return (
-        row.get(f"{factor} {prefix} LCL", [None]).values[0],
-        row.get(f"{factor} {prefix} UCL", [None]).values[0]
-    )
-def get_control_batch(color):
-    row = limit_df[limit_df["Color_code"] == color]
-    if row.empty:
-        return None
-    return int(row["Control_batch"].values[0])
 
-# =========================
 # OUT-OF-CONTROL DETECTION
 # =========================
 def detect_out_of_control(spc_df, lcl, ucl):
@@ -1052,6 +1052,7 @@ st.dataframe(
     ].sort_values(by=dE_col, ascending=False),
     use_container_width=True
 )
+
 
 
 
