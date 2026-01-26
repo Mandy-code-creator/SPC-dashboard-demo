@@ -429,6 +429,40 @@ def spc_combined(lab, line, title, lab_lim, line_lim, control_batch_code):
             ha="center",
             va="top"
         )
+def spc_combined_phase2(lab, line, title, lab_lim, line_lim, control_batch_code):
+
+    if control_batch_code is None:
+        return None
+
+    # ===== lọc Phase II =====
+    lab2 = lab[lab["製造批號"] >= control_batch_code]
+    line2 = line[line["製造批號"] >= control_batch_code]
+
+    if lab2.empty or line2.empty:
+        return None
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+
+    # ===== vẽ LAB + LINE (GIỐNG CŨ) =====
+    ax.plot(lab2["製造批號"], lab2["value"], "o-", label="LAB", color="#1f77b4")
+    ax.plot(line2["製造批號"], line2["value"], "o-", label="LINE", color="#2ca02c")
+
+    # ===== control limits (GIỐNG Y HỆT) =====
+    if lab_lim[0] is not None:
+        ax.axhline(lab_lim[0], color="#1f77b4", linestyle=":", label="LAB LCL")
+        ax.axhline(lab_lim[1], color="#1f77b4", linestyle=":", label="LAB UCL")
+
+    if line_lim[0] is not None:
+        ax.axhline(line_lim[0], color="red", label="LINE LCL")
+        ax.axhline(line_lim[1], color="red", label="LINE UCL")
+
+    ax.set_title(title + " (Phase II)")
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.grid(True)
+    ax.tick_params(axis="x", rotation=45)
+    fig.subplots_adjust(right=0.78)
+
+    return fig
 
 
     # ===== highlight LAB out-of-limit =====
@@ -528,6 +562,21 @@ for k in spc:
         download(fig, f"COMBINED_{color}_{k}.png")
     else:
         st.info(f"{k}: Combined chart cannot be generated")
+for k in spc:
+    fig = spc_combined_phase2(
+        spc[k]["lab"],
+        spc[k]["line"],
+        f"COMBINED {k}",
+        get_limit(color, k, "LAB"),
+        get_limit(color, k, "LINE"),
+        control_batch_code
+    )
+
+    if fig is not None:
+        st.pyplot(fig)
+        download(fig, f"COMBINED_PHASE2_{color}_{k}.png")
+    else:
+        st.info(f"{k}: Phase II data not sufficient")
 
 # =========================
 # =========================
@@ -1128,6 +1177,7 @@ st.dataframe(
 )
 
 # =========================
+
 
 
 
