@@ -618,7 +618,6 @@ for k in ["ΔL", "Δa", "Δb"]:
 
 # =========================
 # =========================
-# =========================
 # DISTRIBUTION DASHBOARD
 # =========================
 
@@ -628,25 +627,6 @@ def calc_capability(values, lcl, ucl):
 
     mean = values.mean()
     std = values.std()
-
-    if std == 0 or np.isnan(std):
-        return None, None, None
-
-    cp = (ucl - lcl) / (6 * std)
-    cpk = min(
-        (ucl - mean) / (3 * std),
-        (mean - lcl) / (3 * std)
-    )
-    ca = abs(mean - (ucl + lcl) / 2) / ((ucl - lcl) / 2)
-
-    return round(ca, 2), round(cp, 2), round(cpk, 2)
-
-
-def normal_pdf(x, mean, std):
-    return (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
-        -0.5 * ((x - mean) / std) ** 2
-    )
-
 
 # =========================
 # =========================
@@ -673,9 +653,6 @@ for i, k in enumerate(spc):
         mean = values.mean()
         std = values.std()
         lcl, ucl = get_limit(color, k, "LINE")
-
-        # ===== capability (BẮT BUỘC PHẢI Ở ĐÂY) =====
-        ca, cp, cpk = calc_capability(values, lcl, ucl)
 
         fig, ax = plt.subplots(figsize=(5, 4))
 
@@ -712,18 +689,6 @@ for i, k in enumerate(spc):
             ax.axvline(lcl, color="red", linestyle="--", linewidth=1.5, label="LSL")
         if ucl is not None:
             ax.axvline(ucl, color="red", linestyle="--", linewidth=1.5, label="USL")
-
-        # ===== Capability box =====
-        if cp is not None:
-            ax.text(
-                0.98, 0.95,
-                f"Ca  = {ca}\nCp  = {cp}\nCpk = {cpk}",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.9)
-            )
 
         # ===== Info box =====
         ax.text(
@@ -804,9 +769,7 @@ for i, k in enumerate(spc):
         std = values.std()
         lcl, ucl = get_limit(color, k, "LAB")
 
-        # ===== capability =====
-        ca, cp, cpk = calc_capability(values, lcl, ucl)
-
+       
         fig, ax = plt.subplots(figsize=(5, 4))
 
         # ===== Histogram =====
@@ -842,18 +805,6 @@ for i, k in enumerate(spc):
             ax.axvline(lcl, color="red", linestyle="--", linewidth=1.5, label="LSL")
         if ucl is not None:
             ax.axvline(ucl, color="red", linestyle="--", linewidth=1.5, label="USL")
-
-        # ===== Capability box =====
-        if cp is not None:
-            ax.text(
-                0.98, 0.95,
-                f"Ca  = {ca}\nCp  = {cp}\nCpk = {cpk}",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=9,
-                bbox=dict(facecolor="white", alpha=0.9)
-            )
 
         # ===== Info box =====
         ax.text(
@@ -1496,6 +1447,7 @@ with tab2:
 
 with tab3:
     st.dataframe(cpk_df, use_container_width=True)
+
 
 
 
