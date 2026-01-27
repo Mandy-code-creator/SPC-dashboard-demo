@@ -1067,51 +1067,12 @@ st.pyplot(fig2)
 import numpy as np
 import math
 
-st.subheader("📊 Average Thickness Distribution (Histogram + Normal Curve)")
-
-# =========================
-# DATA
-# =========================
-data = df_plot[thickness_col].dropna()
-
-mean = data.mean()
-std = data.std()
-
-# =========================
-# SPEC INPUT
-# =========================
-col1, col2 = st.columns(2)
-
-with col1:
-    LSL = st.number_input(
-        "LSL (Lower Spec Limit)",
-        value=float(mean - 3*std)
-    )
-
-with col2:
-    USL = st.number_input(
-        "USL (Upper Spec Limit)",
-        value=float(mean + 3*std)
-    )
-
-if LSL >= USL:
-    st.error("❌ LSL must be smaller than USL")
-    st.stop()
-
-# =========================
-# NORMAL CURVE (NO SCIPY, LONG TAIL)
-# =========================
-x = np.linspace(mean - 5*std, mean + 5*std, 1000)
-y = (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
-    -0.5 * ((x - mean) / std) ** 2
-)
-
 # =========================
 # PLOT
 # =========================
 fig, ax = plt.subplots(figsize=(10, 4))
 
-# Histogram (CỘT)
+# Histogram
 ax.hist(
     data,
     bins=20,
@@ -1121,7 +1082,7 @@ ax.hist(
     label="Thickness Histogram"
 )
 
-# Normal curve (ĐƯỜNG)
+# Normal curve
 ax.plot(
     x,
     y,
@@ -1129,35 +1090,43 @@ ax.plot(
     label="Normal Distribution"
 )
 
-# Mean & Spec
-ax.axvline(mean, linestyle="--", linewidth=2, label="Mean")
-ax.axvline(LSL, linestyle="--", linewidth=2, label="LSL")
-ax.axvline(USL, linestyle="--", linewidth=2, label="USL")
+# Mean & Spec (CHỈ VẼ 1 LẦN)
+ax.axvline(
+    mean,
+    linestyle="--",
+    linewidth=2,
+    label=f"Mean = {mean:.2f}"
+)
 
-# Không bị cắt đuôi
+ax.axvline(
+    LSL,
+    linestyle="--",
+    linewidth=2,
+    label=f"LSL = {LSL:.2f}"
+)
+
+ax.axvline(
+    USL,
+    linestyle="--",
+    linewidth=2,
+    label=f"USL = {USL:.2f}"
+)
+
+# Normal Zone
+ax.axvspan(
+    LSL,
+    USL,
+    alpha=0.15,
+    label="Spec Zone"
+)
+
+# Axis & layout
 ax.set_xlim(mean - 5*std, mean + 5*std)
-
-ax.set_xlabel("Thickness")
-ax.set_ylabel("Density")
-ax.legend()
-ax.grid(alpha=0.3)
-
-
-# Mean & Spec
-ax.axvline(mean, linestyle="--", linewidth=2,
-           label=f"Mean = {mean:.2f}")
-
-ax.axvline(LSL, linewidth=2, label="LSL")
-ax.axvline(USL, linewidth=2, label="USL")
-
-# Normal zone
-ax.axvspan(LSL, USL, alpha=0.15, label="Normal Zone")
-
 ax.set_xlabel("Average Thickness")
 ax.set_ylabel("Density")
 ax.set_title("Thickness Distribution with Normal Curve (Per Coil)")
-ax.legend()
 ax.grid(True, linestyle="--", alpha=0.4)
+ax.legend()
 
 st.pyplot(fig)
 
@@ -1399,6 +1368,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
