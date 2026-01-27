@@ -1135,6 +1135,7 @@ ax.axvline(
     mean,
     linestyle="--",
     linewidth=2,
+    color="red",
     label=f"Mean = {mean:.2f}"
 )
 
@@ -1142,6 +1143,7 @@ ax.axvline(
     LSL,
     linestyle="--",
     linewidth=2,
+    color="green",
     label=f"LSL = {LSL:.2f}"
 )
 
@@ -1149,6 +1151,7 @@ ax.axvline(
     USL,
     linestyle="--",
     linewidth=2,
+    color="green",
     label=f"USL = {USL:.2f}"
 )
 
@@ -1408,6 +1411,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
