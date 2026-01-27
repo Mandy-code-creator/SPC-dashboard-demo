@@ -1068,6 +1068,46 @@ import numpy as np
 import math
 
 # =========================
+st.subheader("📊 Average Thickness Distribution (Histogram + Normal Curve)")
+
+# =========================
+# DATA
+# =========================
+data = df_plot[thickness_col].dropna()
+
+mean = data.mean()
+std = data.std()
+
+# =========================
+# SPEC INPUT
+# =========================
+col1, col2 = st.columns(2)
+
+with col1:
+    LSL = st.number_input(
+        "LSL (Lower Spec Limit)",
+        value=float(mean - 3 * std)
+    )
+
+with col2:
+    USL = st.number_input(
+        "USL (Upper Spec Limit)",
+        value=float(mean + 3 * std)
+    )
+
+if LSL >= USL:
+    st.error("❌ LSL must be smaller than USL")
+    st.stop()
+
+# =========================
+# NORMAL CURVE (NO SCIPY, LONG TAIL)
+# =========================
+x = np.linspace(mean - 5 * std, mean + 5 * std, 1000)
+y = (1 / (std * math.sqrt(2 * math.pi))) * np.exp(
+    -0.5 * ((x - mean) / std) ** 2
+)
+
+# =========================
 # PLOT
 # =========================
 fig, ax = plt.subplots(figsize=(10, 4))
@@ -1112,7 +1152,7 @@ ax.axvline(
     label=f"USL = {USL:.2f}"
 )
 
-# Normal Zone
+# Spec zone
 ax.axvspan(
     LSL,
     USL,
@@ -1120,8 +1160,8 @@ ax.axvspan(
     label="Spec Zone"
 )
 
-# Axis & layout
-ax.set_xlim(mean - 5*std, mean + 5*std)
+# Layout
+ax.set_xlim(mean - 5 * std, mean + 5 * std)
 ax.set_xlabel("Average Thickness")
 ax.set_ylabel("Density")
 ax.set_title("Thickness Distribution with Normal Curve (Per Coil)")
@@ -1368,6 +1408,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
