@@ -282,8 +282,6 @@ control_batch = get_control_batch(color)
 control_batch_code = get_control_batch_code(df, control_batch)
 
 
-st.sidebar.write("DEBUG Control_batch =", control_batch)
-
 if control_batch is not None and not df.empty:
 
     batch_order = (
@@ -1491,6 +1489,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
