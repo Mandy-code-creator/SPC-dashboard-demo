@@ -13,6 +13,9 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
+st.title("室內隔間用途－塗料入料管控結果專案報告")
+st.caption("Incoming Paint SPC · LAB / LINE · Phase II Monitoring")
+
 st.markdown(
     """
     <style>
@@ -1411,6 +1414,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
