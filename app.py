@@ -13,6 +13,57 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
+st.markdown(
+    """
+    <style>
+    /* ===== SIDEBAR CONTAINER ===== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f8fafc, #eef2f7);
+        padding: 1.2rem 0.8rem;
+        border-right: 1px solid #d0d7de;
+    }
+
+    /* ===== SIDEBAR HEADER ===== */
+    .sidebar-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 0.2rem;
+    }
+
+    .sidebar-subtitle {
+        font-size: 0.8rem;
+        color: #475569;
+        margin-bottom: 1rem;
+    }
+
+    /* ===== SECTION TITLE ===== */
+    .sidebar-section {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #334155;
+        margin-top: 1.1rem;
+        margin-bottom: 0.3rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    /* ===== WIDGET LABEL ===== */
+    [data-testid="stSidebar"] label {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    /* ===== ALERT BOX ===== */
+    [data-testid="stSidebar"] .stAlert {
+        border-radius: 10px;
+        font-size: 0.85rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("室內隔間用途－塗料入料管控專案")
 st.caption("Incoming Paint SPC · LAB / LINE · Phase II Monitoring")
 
@@ -174,7 +225,20 @@ def get_control_batch_code(df, control_batch):
 # =========================
 # SIDEBAR – FILTER
 # =========================
-st.sidebar.title("🎨 Filter")
+st.sidebar.markdown(
+    """
+    <div class="sidebar-title">📊 SPC Control Panel</div>
+    <div class="sidebar-subtitle">
+        Incoming Paint Quality<br>
+        Phase II Monitoring
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+st.sidebar.markdown(
+    '<div class="sidebar-section">🎨 COLOR FILTER</div>',
+    unsafe_allow_html=True
+)
 
 color = st.sidebar.selectbox(
     "Color code",
@@ -182,6 +246,10 @@ color = st.sidebar.selectbox(
 )
 
 df = df[df["塗料編號"] == color]
+st.sidebar.markdown(
+    '<div class="sidebar-section">🎨 COLOR FILTER</div>',
+    unsafe_allow_html=True
+)
 
 latest_year = df["Time"].dt.year.max()
 year = st.sidebar.selectbox(
@@ -205,6 +273,11 @@ st.sidebar.divider()
 # =========================
 # CONTROL BATCH INFO (SIDEBAR)
 # =========================
+st.sidebar.markdown(
+    '<div class="sidebar-section">🎯 CONTROL BATCH</div>',
+    unsafe_allow_html=True
+)
+
 control_batch = get_control_batch(color)
 control_batch_code = get_control_batch_code(df, control_batch)
 
@@ -248,6 +321,10 @@ def show_limits(factor):
         table[c] = table[c].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
     st.sidebar.markdown(f"**{factor} Control Limits**")
     st.sidebar.dataframe(table, use_container_width=True, hide_index=True)
+st.sidebar.markdown(
+    '<div class="sidebar-section">📏 CONTROL LIMITS</div>',
+    unsafe_allow_html=True
+)
 
 show_limits("LAB")
 show_limits("LINE")
@@ -1414,6 +1491,7 @@ criteria_table = pd.DataFrame({
 st.dataframe(criteria_table, use_container_width=True)
 
 # =========================
+
 
 
 
