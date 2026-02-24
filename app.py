@@ -167,7 +167,7 @@ def calculate_batch_averages(df_filtered_color):
 st.sidebar.markdown("### 📊 View Mode")
 app_mode = st.sidebar.radio(
     "Select View Mode",
-    ["🚀 Main Dashboard", "📋 Limit Status Summary", "🎛️ Control Limit Calculator","📈 Predictive Trend & Forecasting"],
+    ["🚀 Main Dashboard", "📋 Limit Status Summary", "🎛️ Control Limit Calculator","🔬 Lab vs Line Scale-up"],
     label_visibility="collapsed"
 )
 
@@ -1069,6 +1069,7 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                     # Cảnh báo dựa trên Slope (Độ dốc)
                     if r2_val < 0.3:
                         st.error("⚠️ **Low Confidence:** The historical correlation between LAB and LINE is very weak (Low R²). This prediction may not be highly accurate.")
+
 
 
 
