@@ -844,11 +844,11 @@ elif app_mode == "🎛️ Control Limit Calculator":
 
             # =========================================================
            # =========================================================
-            # NEW: AI TOLERANCE RECOMMENDATION (MATH + VISUAL + PROCESS CAPABILITY)
+          # =========================================================
+            # NEW: AI TOLERANCE RECOMMENDATION (PRACTICAL ADAPTIVE)
             # =========================================================
             st.markdown("---")
-            st.markdown("### 💡 Optimal Tolerance Recommendation")
-            st.markdown(f"To guarantee **ΔE ≤ {limit_threshold}** without visible hue shifts, the system calculates optimal limits. It also compares these against your **current process variation (3σ)** to check feasibility.")
+            st.markdown("### 💡 AI Tolerance Recommendation")
             
             # Lấy độ lệch chuẩn (s) của từng yếu tố từ data thực tế
             s_L = calc_res["ΔL"]['s']
@@ -857,51 +857,74 @@ elif app_mode == "🎛️ Control Limit Calculator":
             var_sum = s_L**2 + s_a**2 + s_b**2
             
             if var_sum > 0:
-                # 1. Tính toán ngân sách toán học
-                M = limit_threshold / math.sqrt(var_sum)
-                math_L = M * s_L
-                math_a = M * s_a
-                math_b = M * s_b
-                
-                # Mức trần thị giác
+                # Mức trần thị giác (Visual Cap) không cho phép vượt qua
                 visual_cap = 0.600 if calc_source.upper() == "LINE" else 0.350
                 
-                def evaluate_tolerance(math_val, s_val, cap_limit):
-                    # Chốt giới hạn đề xuất (Bị cắt ngọn nếu vượt quá visual cap)
-                    rec_val = min(math_val, cap_limit)
-                    is_capped = math_val > cap_limit
-                    
-                    # Tính toán độ biến động tự nhiên của dữ liệu hiện tại (± 3 Sigma)
-                    process_spread = 3 * s_val
-                    
-                    # Đánh giá: Quá trình có khả năng đáp ứng giới hạn này không?
-                    is_incapable = process_spread > rec_val
-                    
-                    return rec_val, is_capped, process_spread, is_incapable
-
-                rec_L, cap_L, proc_L, incap_L = evaluate_tolerance(math_L, s_L, visual_cap)
-                rec_a, cap_a, proc_a, incap_a = evaluate_tolerance(math_a, s_a, visual_cap)
-                rec_b, cap_b, proc_b, incap_b = evaluate_tolerance(math_b, s_b, visual_cap)
+                # Biến động thực tế của dây chuyền (3-Sigma)
+                proc_L = 3 * s_L
+                proc_a = 3 * s_a
+                proc_b = 3 * s_b
+                proc_dE = math.sqrt(proc_L**2 + proc_a**2 + proc_b**2)
                 
                 col_rl, col_ra, col_rb = st.columns(3)
                 
-                # Hàm hiển thị card đánh giá năng lực
-                def render_capability_card(col, label, rec_val, is_capped, math_val, proc_val, is_incapable):
-                    cap_text = f"Capped from {math_val:.3f}" if is_capped else "Optimal Math"
+                if proc_dE <= limit_threshold:
+                    # ---------------------------------------------------------
+                    # TÌNH HUỐNG 1: MÁY CHẠY RẤT ỔN ĐỊNH (CAPABLE)
+                    # ---------------------------------------------------------
+                    st.success(f"🌟 **Process Capable!** Your natural 3σ variation yields ΔE = **{proc_dE:.3f}** (≤ {limit_threshold}). The system mathematically expands your limits to give production the maximum safe tolerance.")
                     
-                    if is_incapable:
-                        # Dữ liệu hiện tại biến động quá lớn, không thể ép vào giới hạn này
-                        col.error(f"**{label} Max Limit:**\n### ± {rec_val:.3f}\n*({cap_text})*\n\n⚠️ **Warning:** Process natural 3σ is **±{proc_val:.3f}**. Data fluctuation is too high to strictly meet this limit!")
-                    else:
-                        # Dữ liệu hiện tại ổn định, hoàn toàn đáp ứng được giới hạn này
-                        col.success(f"**{label} Max Limit:**\n### ± {rec_val:.3f}\n*({cap_text})*\n\n✅ **Capable:** Process natural 3σ is **±{proc_val:.3f}**, which fits safely inside.")
+                    # Nới rộng dung sai an toàn
+                    M = limit_threshold / math.sqrt(var_sum)
+                    math_L, math_a, math_b = M * s_L, M * s_a, M * s_b
+                    
+                    def get_optimal(math_val, cap_val):
+                        return min(math_val, cap_val), math_val > cap_val
+                    
+                    rec_L, cap_L = get_optimal(math_L, visual_cap)
+                    rec_a, cap_a = get_optimal(math_a, visual_cap)
+                    rec_b, cap_b = get_optimal(math_b, visual_cap)
+                    
+                    def render_card(col, label, val, is_capped, orig_val):
+                        if is_capped:
+                            col.info(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Capped from {orig_val:.3f} to protect vision)*")
+                        else:
+                            col.success(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Safe & Optimal)*")
 
-                render_capability_card(col_rl, "ΔL", rec_L, cap_L, math_L, proc_L, incap_L)
-                render_capability_card(col_ra, "Δa", rec_a, cap_a, math_a, proc_a, incap_a)
-                render_capability_card(col_rb, "Δb", rec_b, cap_b, math_b, proc_b, incap_b)
-                
+                    render_card(col_rl, "ΔL", rec_L, cap_L, math_L)
+                    render_card(col_ra, "Δa", rec_a, cap_a, math_a)
+                    render_card(col_rb, "Δb", rec_b, cap_b, math_b)
+                    
+                else:
+                    # ---------------------------------------------------------
+                    # TÌNH HUỐNG 2: MÁY DAO ĐỘNG LỚN (INCAPABLE) -> THỰC TẾ HÓA
+                    # ---------------------------------------------------------
+                    st.warning(f"⚠️ **Strict Spec Unrealistic!** Your process natural 3σ yields ΔE = **{proc_dE:.3f}** (> {limit_threshold}). Forcing strict specs will cause false alarms. Below are the **Practical Limits** adapting to your actual machine capability:")
+                    
+                    def get_practical(proc_val, cap_val):
+                        return min(proc_val, cap_val), proc_val > cap_val
+                    
+                    # Chấp nhận dung sai bằng 3 Sigma thực tế (nhưng không được vượt mức trần thị giác)
+                    rec_L, cap_L = get_practical(proc_L, visual_cap)
+                    rec_a, cap_a = get_practical(proc_a, visual_cap)
+                    rec_b, cap_b = get_practical(proc_b, visual_cap)
+                    
+                    def render_practical_card(col, label, val, is_capped, orig_val):
+                        if is_capped:
+                            col.error(f"**{label} Practical Limit:**\n### ± {val:.3f}\n*(Hard capped from 3σ={orig_val:.3f} to prevent hue shift)*")
+                        else:
+                            col.warning(f"**{label} Practical Limit:**\n### ± {val:.3f}\n*(Based on actual 3σ)*")
+
+                    render_practical_card(col_rl, "ΔL", rec_L, cap_L, proc_L)
+                    render_practical_card(col_ra, "Δa", rec_a, cap_a, proc_a)
+                    render_practical_card(col_rb, "Δb", rec_b, cap_b, proc_b)
+                    
+                    # Tính lại dE thực tế sau khi áp dụng giới hạn này
+                    prac_dE = math.sqrt(rec_L**2 + rec_a**2 + rec_b**2)
+                    st.caption(f"🎯 *Note: By applying these practical limits, your expected ΔE UCL will be ~**{prac_dE:.3f}**. To bring this down to {limit_threshold}, you must fundamentally reduce machine fluctuation.*")
+                    
             else:
-                st.warning("Data variance is zero. Cannot generate proportional recommendations.")
+                st.warning("Data variance is zero. Cannot generate recommendations.")
 # =========================================================
     # MANUAL ΔE CALCULATOR (Bottom Section)
     # =========================================================
@@ -933,6 +956,7 @@ elif app_mode == "🎛️ Control Limit Calculator":
     
     # Hiển thị công thức minh hoạ (Tùy chọn)
     st.latex(r"\Delta E = \sqrt{\Delta L^2 + \Delta a^2 + \Delta b^2}")
+
 
 
 
