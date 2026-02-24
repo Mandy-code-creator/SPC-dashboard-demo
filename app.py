@@ -815,7 +815,65 @@ elif app_mode == "🎛️ Control Limit Calculator":
                     st.success(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (✅ ≤ {limit_threshold})")
                 else: 
                     st.error(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (⚠️ > {limit_threshold})")
+# --- ĐIỀN KẾT QUẢ VÀO PLACEHOLDER Ở ĐẦU TRANG CHO CẢ 2 PHƯƠNG PHÁP ---
+    if len(calc_res) == 3:
+        # Căn bậc 2 để ra giá trị ΔE cuối cùng
+        dE_std = math.sqrt(dE_std_sq)
+        dE_iqr = math.sqrt(dE_iqr_sq)
+        
+        # Mốc đánh giá tùy theo LINE hay LAB
+        limit_threshold = 1.0 if calc_source.upper() == "LINE" else 0.5
+        
+        with result_placeholder.container():
+            st.markdown("### 🎯 Derived ΔE UCL Comparison")
+            col_res1, col_res2 = st.columns(2)
+            
+            # Hiển thị kết quả Method 1 (Standard)
+            with col_res1:
+                if dE_std <= limit_threshold: 
+                    st.success(f"**Method 1 (Standard)** ΔE UCL: **{dE_std:.3f}** (✅ ≤ {limit_threshold})")
+                else: 
+                    st.error(f"**Method 1 (Standard)** ΔE UCL: **{dE_std:.3f}** (⚠️ > {limit_threshold})")
+                    
+            # Hiển thị kết quả Method 2 (IQR)
+            with col_res2:
+                if dE_iqr <= limit_threshold: 
+                    st.success(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (✅ ≤ {limit_threshold})")
+                else: 
+                    st.error(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (⚠️ > {limit_threshold})")
 
+            # =========================================================
+            # NEW: AI TOLERANCE RECOMMENDATION
+            # =========================================================
+            st.markdown("---")
+            st.markdown("### 💡 Optimal Tolerance Recommendation")
+            st.markdown(f"To guarantee that the overall color difference remains **ΔE ≤ {limit_threshold}**, the individual limits for ΔL, Δa, and Δb must be constrained. Based on the actual variance of your process data, here is the mathematically optimal distribution of control limits:")
+            
+            # Lấy độ lệch chuẩn (s) của từng yếu tố từ data thực tế
+            s_L = calc_res["ΔL"]['s']
+            s_a = calc_res["Δa"]['s']
+            s_b = calc_res["Δb"]['s']
+            
+            # Tính tổng phương sai
+            var_sum = s_L**2 + s_a**2 + s_b**2
+            
+            if var_sum > 0:
+                # Hệ số nhân (Multiplier) để ép tổng không gian 3D về đúng chuẩn Threshold
+                M = limit_threshold / math.sqrt(var_sum)
+                
+                # Tính ra dung sai đề xuất (Recommended tolerance)
+                rec_L = M * s_L
+                rec_a = M * s_a
+                rec_b = M * s_b
+                
+                col_rl, col_ra, col_rb = st.columns(3)
+                col_rl.info(f"**ΔL Max Limit:**\n### ± {rec_L:.3f}")
+                col_ra.info(f"**Δa Max Limit:**\n### ± {rec_a:.3f}")
+                col_rb.info(f"**Δb Max Limit:**\n### ± {rec_b:.3f}")
+                
+                st.caption(f"*Note: This recommendation distributes the {limit_threshold} ΔE budget proportionally to the natural standard deviations of your current data.*")
+            else:
+                st.warning("Data variance is zero. Cannot generate proportional recommendations.")
 # =========================================================
     # MANUAL ΔE CALCULATOR (Bottom Section)
     # =========================================================
@@ -847,6 +905,7 @@ elif app_mode == "🎛️ Control Limit Calculator":
     
     # Hiển thị công thức minh hoạ (Tùy chọn)
     st.latex(r"\Delta E = \sqrt{\Delta L^2 + \Delta a^2 + \Delta b^2}")
+
 
 
 
