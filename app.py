@@ -843,35 +843,56 @@ elif app_mode == "🎛️ Control Limit Calculator":
                     st.error(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (⚠️ > {limit_threshold})")
 
             # =========================================================
-            # NEW: AI TOLERANCE RECOMMENDATION
+            # =========================================================
+            # NEW: AI TOLERANCE RECOMMENDATION (WITH VISUAL CAP)
             # =========================================================
             st.markdown("---")
             st.markdown("### 💡 Optimal Tolerance Recommendation")
-            st.markdown(f"To guarantee that the overall color difference remains **ΔE ≤ {limit_threshold}**, the individual limits for ΔL, Δa, and Δb must be constrained. Based on the actual variance of your process data, here is the mathematically optimal distribution of control limits:")
+            st.markdown(f"To guarantee **ΔE ≤ {limit_threshold}** without causing visible hue shifts to the naked eye, the system distributes tolerances based on your process variance, while applying strict visual constraints.")
             
             # Lấy độ lệch chuẩn (s) của từng yếu tố từ data thực tế
             s_L = calc_res["ΔL"]['s']
             s_a = calc_res["Δa"]['s']
             s_b = calc_res["Δb"]['s']
-            
-            # Tính tổng phương sai
             var_sum = s_L**2 + s_a**2 + s_b**2
             
             if var_sum > 0:
-                # Hệ số nhân (Multiplier) để ép tổng không gian 3D về đúng chuẩn Threshold
+                # Hệ số nhân (Multiplier) toán học
                 M = limit_threshold / math.sqrt(var_sum)
                 
-                # Tính ra dung sai đề xuất (Recommended tolerance)
-                rec_L = M * s_L
-                rec_a = M * s_a
-                rec_b = M * s_b
+                # Tính ra dung sai toán học ban đầu
+                math_L = M * s_L
+                math_a = M * s_a
+                math_b = M * s_b
+                
+                # --- VISUAL HARD CAP (GIỚI HẠN THỊ GIÁC BẰNG MẮT THƯỜNG) ---
+                # Đặt mức trần: Ngăn không cho bất kỳ yếu tố đơn lẻ nào quá lớn gây lệch màu cảm quan
+                visual_cap = 0.600 if calc_source.upper() == "LINE" else 0.350
+                
+                # Hàm cắt ngọn và tạo cảnh báo nếu bị cắt
+                def apply_visual_cap(val, cap_limit):
+                    if val > cap_limit:
+                        return cap_limit, True  # Bị cắt ngọn
+                    return val, False           # Giữ nguyên
+
+                rec_L, capped_L = apply_visual_cap(math_L, visual_cap)
+                rec_a, capped_a = apply_visual_cap(math_a, visual_cap)
+                rec_b, capped_b = apply_visual_cap(math_b, visual_cap)
                 
                 col_rl, col_ra, col_rb = st.columns(3)
-                col_rl.info(f"**ΔL Max Limit:**\n### ± {rec_L:.3f}")
-                col_ra.info(f"**Δa Max Limit:**\n### ± {rec_a:.3f}")
-                col_rb.info(f"**Δb Max Limit:**\n### ± {rec_b:.3f}")
                 
-                st.caption(f"*Note: This recommendation distributes the {limit_threshold} ΔE budget proportionally to the natural standard deviations of your current data.*")
+                # Hàm hiển thị card kết quả
+                def render_card(col, label, val, is_capped, math_val):
+                    if is_capped:
+                        col.warning(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Capped from {math_val:.3f})*")
+                    else:
+                        col.info(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Optimal)*")
+
+                render_card(col_rl, "ΔL", rec_L, capped_L, math_L)
+                render_card(col_ra, "Δa", rec_a, capped_a, math_a)
+                render_card(col_rb, "Δb", rec_b, capped_b, math_b)
+                
+                st.caption(f"*Note: Mathematical distribution is capped at a strict maximum of **±{visual_cap:.3f}** per individual factor to prevent naked-eye color differences (Visual JND).*")
             else:
                 st.warning("Data variance is zero. Cannot generate proportional recommendations.")
 # =========================================================
@@ -905,6 +926,7 @@ elif app_mode == "🎛️ Control Limit Calculator":
     
     # Hiển thị công thức minh hoạ (Tùy chọn)
     st.latex(r"\Delta E = \sqrt{\Delta L^2 + \Delta a^2 + \Delta b^2}")
+
 
 
 
