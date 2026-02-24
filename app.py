@@ -956,6 +956,119 @@ elif app_mode == "🎛️ Control Limit Calculator":
     
     # Hiển thị công thức minh hoạ (Tùy chọn)
     st.latex(r"\Delta E = \sqrt{\Delta L^2 + \Delta a^2 + \Delta b^2}")
+# VIEW 5: LAB VS LINE SCALE-UP ANALYSIS
+# =========================================================
+elif app_mode == "🔬 Lab vs Line Scale-up":
+    st.title("🔬 Lab to Line Scale-up Analysis")
+    st.markdown("Analyze the historical shift (offset) between Laboratory inputs (LAB) and actual Mass Production results (LINE) to predict future production variations.")
+
+    if df.empty:
+        st.warning("⚠️ No data available for analysis.")
+    else:
+        # --- 1. DATA PREPARATION (Ghép cặp LAB và LINE theo từng mẻ) ---
+        batch_compare = df.groupby("製造批號", as_index=False).agg({
+            "入料檢測 ΔL 正面": "mean", "入料檢測 Δa 正面": "mean", "入料檢測 Δb 正面": "mean",
+            "正-北 ΔL": "mean", "正-南 ΔL": "mean",
+            "正-北 Δa": "mean", "正-南 Δa": "mean",
+            "正-北 Δb": "mean", "正-南 Δb": "mean"
+        }).dropna()
+
+        # Tính trung bình LINE (Bắc + Nam)
+        batch_compare["LINE_ΔL"] = batch_compare[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
+        batch_compare["LINE_Δa"] = batch_compare[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
+        batch_compare["LINE_Δb"] = batch_compare[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
+
+        batch_compare = batch_compare.rename(columns={
+            "入料檢測 ΔL 正面": "LAB_ΔL",
+            "入料檢測 Δa 正面": "LAB_Δa",
+            "入料檢測 Δb 正面": "LAB_Δb"
+        })
+
+        factors = ["ΔL", "Δa", "Δb"]
+        
+        # --- 2. PHÂN TÍCH TỪNG YẾU TỐ BẰNG TABS ---
+        tabs = st.tabs(factors)
+        
+        for i, f in enumerate(factors):
+            with tabs[i]:
+                lab_col = f"LAB_{f}"
+                line_col = f"LINE_{f}"
+                
+                # Lấy dữ liệu X (LAB) và Y (LINE)
+                x = batch_compare[lab_col].values
+                y = batch_compare[line_col].values
+                
+                if len(x) < 3:
+                    st.info(f"Not enough paired LAB-LINE data for {f}.")
+                    continue
+                    
+                # Tính toán các chỉ số thống kê
+                diff = y - x  # Độ lệch Shift = LINE - LAB
+                mean_shift = np.mean(diff)
+                std_shift = np.std(diff)
+                
+                slope, intercept = np.polyfit(x, y, 1)
+                r_val = np.corrcoef(x, y)[0, 1]
+                r2_val = r_val**2
+                
+                # --- 3. HIỂN THỊ METRICS ---
+                st.markdown(f"### 📊 Correlation Metrics: **{f}**")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Average Shift (LINE - LAB)", f"{mean_shift:+.3f}", delta="Historical Bias", delta_color="off")
+                col2.metric("Shift Fluctuation (1σ)", f"±{std_shift:.3f}", delta="Process Variance", delta_color="off")
+                col3.metric("Correlation (R²)", f"{r2_val:.3f}", delta="Predictability", delta_color="off")
+                
+                # Diễn giải AI
+                if mean_shift > 0.1:
+                    st.warning(f"📈 **Upward Shift:** Production (LINE) tends to be **HIGHER** than LAB input by an average of **{mean_shift:+.3f}**.")
+                elif mean_shift < -0.1:
+                    st.warning(f"📉 **Downward Shift:** Production (LINE) tends to be **LOWER** than LAB input by an average of **{mean_shift:+.3f}**.")
+                else:
+                    st.success(f"✅ **Consistent:** Production (LINE) matches LAB closely (Minimal average shift of **{mean_shift:+.3f}**).")
+                
+                # --- 4. BIỂU ĐỒ SCATTER ---
+                col_chart, col_pred = st.columns([2, 1])
+                
+                with col_chart:
+                    fig, ax = plt.subplots(figsize=(7, 5))
+                    ax.scatter(x, y, alpha=0.7, color="#1f77b4", edgecolor="black", label="Historical Batches")
+                    
+                    # Đường Y=X (Lý tưởng)
+                    min_val = min(min(x), min(y))
+                    max_val = max(max(x), max(y))
+                    ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.5, label="Ideal (LINE = LAB)")
+                    
+                    # Đường Hồi quy (Thực tế)
+                    x_range = np.linspace(min(x), max(x), 100)
+                    ax.plot(x_range, slope * x_range + intercept, 'r-', linewidth=2, label=f"Trend Line (R²={r2_val:.2f})")
+                    
+                    ax.set_title(f"Lab-to-Line Scatter: {f}")
+                    ax.set_xlabel(f"LAB Input ({f})")
+                    ax.set_ylabel(f"LINE Actual ({f})")
+                    ax.legend()
+                    ax.grid(True, linestyle="--", alpha=0.4)
+                    st.pyplot(fig)
+                    plt.close(fig)
+                
+                # --- 5. BỘ DỰ BÁO NHẬP LIỆU (PREDICTION CALCULATOR) ---
+                with col_pred:
+                    st.markdown("### 🔮 Predict LINE Result")
+                    st.markdown("Enter a new LAB test value to predict the actual production outcome.")
+                    
+                    # Lấy giá trị LAB gần nhất làm mặc định
+                    default_lab = float(x[-1]) if len(x) > 0 else 0.0
+                    user_lab = st.number_input(f"Input LAB {f}:", value=default_lab, step=0.05, format="%.3f", key=f"pred_{f}")
+                    
+                    # Tính toán dự báo
+                    pred_line = slope * user_lab + intercept
+                    margin_error = 2 * std_shift # Khoảng tin cậy 95% (2 Sigma của độ phân tán)
+                    
+                    st.info(f"**Predicted LINE {f}:**\n## {pred_line:.3f}")
+                    st.caption(f"Estimated Range (95% CI): \n**[{pred_line - margin_error:.3f} to {pred_line + margin_error:.3f}]**")
+                    
+                    # Cảnh báo dựa trên Slope (Độ dốc)
+                    if r2_val < 0.3:
+                        st.error("⚠️ **Low Confidence:** The historical correlation between LAB and LINE is very weak (Low R²). This prediction may not be highly accurate.")
 
 
 
