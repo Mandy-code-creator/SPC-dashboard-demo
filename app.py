@@ -1026,27 +1026,36 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                 else:
                     st.success(f"✅ **Consistent:** Production (LINE) matches LAB closely (Minimal average shift of **{mean_shift:+.3f}**).")
                 
-                # --- 4. BIỂU ĐỒ SCATTER ---
-                col_chart, col_pred = st.columns([2, 1])
-                
                 with col_chart:
                     fig, ax = plt.subplots(figsize=(7, 5))
                     ax.scatter(x, y, alpha=0.7, color="#1f77b4", edgecolor="black", label="Historical Batches")
                     
                     # Đường Y=X (Lý tưởng)
-                    min_val = min(min(x), min(y))
-                    max_val = max(max(x), max(y))
+                    min_val = min(min(x), min(y)) - 0.05
+                    max_val = max(max(x), max(y)) + 0.05
                     ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.5, label="Ideal (LINE = LAB)")
                     
                     # Đường Hồi quy (Thực tế)
                     x_range = np.linspace(min(x), max(x), 100)
                     ax.plot(x_range, slope * x_range + intercept, 'r-', linewidth=2, label=f"Trend Line (R²={r2_val:.2f})")
                     
-                    ax.set_title(f"Lab-to-Line Scatter: {f}")
+                    # --- THÊM CHỈ DẪN MÀU SẮC TRÊN TRỤC (COLOR GUIDES) ---
+                    if f == "ΔL":
+                        ax.text(max_val, max_val, " ☀️ Lighter", va='bottom', ha='left', color='gray', fontsize=9)
+                        ax.text(min_val, min_val, " 🌑 Darker", va='top', ha='right', color='gray', fontsize=9)
+                    elif f == "Δa":
+                        ax.text(max_val, max_val, " 🔴 Redder", va='bottom', ha='left', color='gray', fontsize=9)
+                        ax.text(min_val, min_val, " 🟢 Greener", va='top', ha='right', color='gray', fontsize=9)
+                    elif f == "Δb":
+                        ax.text(max_val, max_val, " 🟡 Yellower", va='bottom', ha='left', color='gray', fontsize=9)
+                        ax.text(min_val, min_val, " 🔵 Bluer", va='top', ha='right', color='gray', fontsize=9)
+
+                    ax.set_title(f"Lab-to-Line Scale-up: {f}")
                     ax.set_xlabel(f"LAB Input ({f})")
                     ax.set_ylabel(f"LINE Actual ({f})")
-                    ax.legend()
+                    ax.legend(loc='lower right')
                     ax.grid(True, linestyle="--", alpha=0.4)
+                    
                     st.pyplot(fig)
                     plt.close(fig)
                 
@@ -1069,6 +1078,7 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                     # Cảnh báo dựa trên Slope (Độ dốc)
                     if r2_val < 0.3:
                         st.error("⚠️ **Low Confidence:** The historical correlation between LAB and LINE is very weak (Low R²). This prediction may not be highly accurate.")
+
 
 
 
