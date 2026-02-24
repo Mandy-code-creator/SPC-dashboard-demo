@@ -961,12 +961,15 @@ elif app_mode == "🎛️ Control Limit Calculator":
 # =========================================================
 elif app_mode == "🔬 Lab vs Line Scale-up":
     st.title("🔬 Lab to Line Scale-up Analysis")
-    st.markdown("Analyze the historical shift (offset) between Laboratory inputs (LAB) and actual Mass Production results (LINE).")
+    st.markdown("""
+    Analyze the historical deviation between **Laboratory (LAB)** inputs and **Production (LINE)** outcomes. 
+    Use this tool to determine the necessary **Offset Compensation** for color formulation.
+    """)
 
     if df.empty:
         st.warning("⚠️ No data available for analysis.")
     else:
-        # --- 1. DATA PREPARATION (Ghép cặp LAB và LINE) ---
+        # --- 1. DATA PREPARATION ---
         batch_compare = df.groupby("製造批號", as_index=False).agg({
             "入料檢測 ΔL 正面": "mean", "入料檢測 Δa 正面": "mean", "入料檢測 Δb 正面": "mean",
             "正-北 ΔL": "mean", "正-南 ΔL": "mean",
@@ -974,7 +977,7 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
             "正-北 Δb": "mean", "正-南 Δb": "mean"
         }).dropna()
 
-        # Tính trung bình LINE (Bắc + Nam)
+        # Average Production (LINE) results
         batch_compare["LINE_ΔL"] = batch_compare[["正-北 ΔL", "正-南 ΔL"]].mean(axis=1)
         batch_compare["LINE_Δa"] = batch_compare[["正-北 Δa", "正-南 Δa"]].mean(axis=1)
         batch_compare["LINE_Δb"] = batch_compare[["正-北 Δb", "正-南 Δb"]].mean(axis=1)
@@ -994,66 +997,69 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                 x, y = batch_compare[lab_col].values, batch_compare[line_col].values
                 
                 if len(x) < 3:
-                    st.info(f"Not enough paired LAB-LINE data for {f}.")
+                    st.info(f"Insufficient paired data for {f}.")
                     continue
                     
-                # --- 2. TÍNH TOÁN THỐNG KÊ & BIAS ---
-                diff = y - x  # Sai lệch thực tế
-                mean_shift = np.mean(diff)
-                std_shift = np.std(diff)
+                # --- 2. STATISTICAL CALCULATION ---
+                diff = y - x
+                mean_bias = np.mean(diff)
+                std_dev = np.std(diff)
                 slope, intercept = np.polyfit(x, y, 1)
-                r2_val = (np.corrcoef(x, y)[0, 1])**2
+                r2_score = (np.corrcoef(x, y)[0, 1])**2
                 
-                # Hiển thị các chỉ số chính (Metrics)
-                st.markdown(f"### 📊 Correlation & Shift Metrics: **{f}**")
+                # Metrics Display
+                st.markdown(f"### 📊 Process Metrics: **{f}**")
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Average Bias (LINE - LAB)", f"{mean_shift:+.3f}", help="Giá trị trung bình LINE lệch so với LAB")
-                m2.metric("Uncertainty (1σ)", f"±{std_shift:.3f}", help="Độ phân tán của sai số")
-                m3.metric("Predictability (R²)", f"{r2_val:.3f}", help="Độ tin cậy của mô hình dự báo")
+                m1.metric("Systematic Bias (Avg)", f"{mean_bias:+.3f}", help="Average deviation between Line and Lab")
+                m2.metric("Fluctuation (1σ)", f"±{std_dev:.3f}", help="Standard deviation of the shift")
+                m3.metric("Predictability (R²)", f"{r2_score:.3f}", help="Model reliability (closer to 1.0 is better)")
 
-                # --- 3. NHẬN XÉT THÔNG MINH (AI INSIGHTS) ---
+                # --- 3. AI ANALYTICAL INSIGHTS ---
+                # Determine direction based on factor
                 if f == "ΔL":
-                    desc = "Sáng hơn (Lighter)" if mean_shift > 0.05 else "Tối hơn (Darker)" if mean_shift < -0.05 else "Ổn định"
+                    direction = "LIGHTER" if mean_bias > 0.05 else "DARKER" if mean_bias < -0.05 else "STABLE"
                 elif f == "Δa":
-                    desc = "Đỏ hơn (Redder)" if mean_shift > 0.05 else "Xanh lá hơn (Greener)" if mean_shift < -0.05 else "Ổn định"
+                    direction = "REDDER" if mean_bias > 0.05 else "GREENER" if mean_bias < -0.05 else "STABLE"
                 else: # Δb
-                    desc = "Vàng hơn (Yellower)" if mean_shift > 0.05 else "Xanh dương hơn (Bluer)" if mean_shift < -0.05 else "Ổn định"
+                    direction = "YELLOWER" if mean_bias > 0.05 else "BLUER" if mean_bias < -0.05 else "STABLE"
 
-                if abs(mean_shift) > 0.05:
-                    st.warning(f"💡 **Insight:** Dây chuyền sản xuất có xu hướng làm màu **{desc}** so với phòng LAB (Offset: {mean_shift:+.3f}).")
+                if direction != "STABLE":
+                    st.warning(f"💡 **Insight:** Production tends to be **{direction}** than Lab samples (Offset: {mean_bias:+.3f}).")
                 else:
-                    st.success(f"✅ **Insight:** Kết quả sản xuất rất khớp với phòng LAB (Độ lệch không đáng kể).")
+                    st.success(f"✅ **Insight:** Production results are highly consistent with Lab inputs.")
 
-                # --- 4. CHIA CỘT HIỂN THỊ BIỂU ĐỒ & DỰ BÁO ---
+                # --- 4. VISUALIZATION & PREDICTOR ---
                 col_chart, col_pred = st.columns([2.2, 1])
                 
                 with col_pred:
-                    st.subheader("🔮 Predictor")
-                    user_lab = st.number_input(f"New LAB {f} Value:", value=float(x[-1]), step=0.01, format="%.3f", key=f"f5_pred_{f}")
+                    st.subheader("🔮 Outcome Predictor")
+                    user_lab = st.number_input(f"Current LAB {f}:", value=float(x[-1]), step=0.01, format="%.3f", key=f"f5_en_{f}")
+                    
+                    # Prediction calculation
                     pred_line = slope * user_lab + intercept
-                    ci = 2 * std_shift
+                    ci_95 = 2 * std_dev
                     
                     st.info(f"**Predicted LINE {f}:**\n## {pred_line:.3f}")
-                    st.caption(f"Estimated Range (95% CI):\n**[{pred_line-ci:.3f} to {pred_line+ci:.3f}]**")
+                    st.caption(f"Confidence Range (95%):\n**[{pred_line-ci_95:.3f} to {pred_line+ci_95:.3f}]**")
                     
-                    # Đề xuất bù trừ (Offset Compensation)
-                    target_offset = -mean_shift
-                    st.success(f"🛠 **Lab Suggestion:** Để Line đạt 0.000, hãy pha Lab ở mức **{target_offset:+.3f}**")
+                    # Offset Suggestion
+                    st.success(f"🛠 **Lab Suggestion:**\nTo reach 0.000 on LINE, formulate LAB at: **{-mean_bias:+.3f}**")
 
                 with col_chart:
                     fig, ax = plt.subplots(figsize=(8, 6))
                     ax.grid(True, linestyle="--", alpha=0.3, zorder=0)
                     
-                    # Vẽ mẻ cũ & điểm dự báo ⭐
-                    ax.scatter(x, y, alpha=0.6, color="#3498db", edgecolors="white", s=80, label="Past Batches", zorder=3)
+                    # Scatter and Prediction Star
+                    ax.scatter(x, y, alpha=0.6, color="#3498db", edgecolors="white", s=80, label="Historical Data", zorder=3)
                     ax.scatter(user_lab, pred_line, color="#f1c40f", edgecolors="black", s=300, marker="*", label="Prediction ⭐", zorder=5)
                     
-                    # Đường Ideal & Trend
+                    # Reference Lines
                     mn, mx = min(x.min(), y.min(), user_lab, pred_line) - 0.1, max(x.max(), y.max(), user_lab, pred_line) + 0.1
-                    ax.plot([mn, mx], [mn, mx], color="#7f8c8d", linestyle="--", alpha=0.6, label="Ideal (LINE=LAB)", zorder=1)
-                    ax.plot(np.linspace(mn, mx, 100), slope * np.linspace(mn, mx, 100) + intercept, color="#e74c3c", linewidth=2.5, label="Trend Line", zorder=2)
+                    ax.plot([mn, mx], [mn, mx], color="#7f8c8d", linestyle="--", alpha=0.6, label="Ideal (LINE = LAB)", zorder=1)
+                    ax.plot(np.linspace(mn, mx, 100), slope * np.linspace(mn, mx, 100) + intercept, color="#e74c3c", linewidth=2.5, label="Actual Trend", zorder=2)
                     
-                    # Color Guides chuyên nghiệp
+                    # Professional Color Guides
+                    
                     bbox_style = dict(boxstyle="round,pad=0.3", alpha=0.1, lw=1)
                     if f == "ΔL":
                         ax.annotate("☀️ Lighter", xy=(0.95, 0.95), xycoords='axes fraction', ha='right', bbox=dict(facecolor='yellow', **bbox_style))
@@ -1065,7 +1071,7 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                         ax.annotate("🟡 Yellower", xy=(0.95, 0.95), xycoords='axes fraction', ha='right', bbox=dict(facecolor='orange', **bbox_style))
                         ax.annotate("🔵 Bluer", xy=(0.05, 0.05), xycoords='axes fraction', ha='left', bbox=dict(facecolor='blue', **bbox_style))
 
-                    ax.set_title(f"Lab-to-Line Scale-up Analysis: {f}", fontweight='bold')
+                    ax.set_title(f"Lab-to-Line Scale-up: {f}", fontweight='bold')
                     ax.set_xlabel(f"LAB Input ({f})")
                     ax.set_ylabel(f"LINE Actual ({f})")
                     ax.legend(loc='lower right')
@@ -1073,7 +1079,6 @@ elif app_mode == "🔬 Lab vs Line Scale-up":
                     
                     st.pyplot(fig)
                     plt.close(fig)
-
 
 
 
