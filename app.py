@@ -843,12 +843,12 @@ elif app_mode == "🎛️ Control Limit Calculator":
                     st.error(f"**Method 2 (IQR)** ΔE UCL: **{dE_iqr:.3f}** (⚠️ > {limit_threshold})")
 
             # =========================================================
-            # =========================================================
-            # NEW: AI TOLERANCE RECOMMENDATION (WITH VISUAL CAP)
+           # =========================================================
+            # NEW: AI TOLERANCE RECOMMENDATION (MATH + VISUAL + PROCESS CAPABILITY)
             # =========================================================
             st.markdown("---")
             st.markdown("### 💡 Optimal Tolerance Recommendation")
-            st.markdown(f"To guarantee **ΔE ≤ {limit_threshold}** without causing visible hue shifts to the naked eye, the system distributes tolerances based on your process variance, while applying strict visual constraints.")
+            st.markdown(f"To guarantee **ΔE ≤ {limit_threshold}** without visible hue shifts, the system calculates optimal limits. It also compares these against your **current process variation (3σ)** to check feasibility.")
             
             # Lấy độ lệch chuẩn (s) của từng yếu tố từ data thực tế
             s_L = calc_res["ΔL"]['s']
@@ -857,42 +857,49 @@ elif app_mode == "🎛️ Control Limit Calculator":
             var_sum = s_L**2 + s_a**2 + s_b**2
             
             if var_sum > 0:
-                # Hệ số nhân (Multiplier) toán học
+                # 1. Tính toán ngân sách toán học
                 M = limit_threshold / math.sqrt(var_sum)
-                
-                # Tính ra dung sai toán học ban đầu
                 math_L = M * s_L
                 math_a = M * s_a
                 math_b = M * s_b
                 
-                # --- VISUAL HARD CAP (GIỚI HẠN THỊ GIÁC BẰNG MẮT THƯỜNG) ---
-                # Đặt mức trần: Ngăn không cho bất kỳ yếu tố đơn lẻ nào quá lớn gây lệch màu cảm quan
+                # Mức trần thị giác
                 visual_cap = 0.600 if calc_source.upper() == "LINE" else 0.350
                 
-                # Hàm cắt ngọn và tạo cảnh báo nếu bị cắt
-                def apply_visual_cap(val, cap_limit):
-                    if val > cap_limit:
-                        return cap_limit, True  # Bị cắt ngọn
-                    return val, False           # Giữ nguyên
+                def evaluate_tolerance(math_val, s_val, cap_limit):
+                    # Chốt giới hạn đề xuất (Bị cắt ngọn nếu vượt quá visual cap)
+                    rec_val = min(math_val, cap_limit)
+                    is_capped = math_val > cap_limit
+                    
+                    # Tính toán độ biến động tự nhiên của dữ liệu hiện tại (± 3 Sigma)
+                    process_spread = 3 * s_val
+                    
+                    # Đánh giá: Quá trình có khả năng đáp ứng giới hạn này không?
+                    is_incapable = process_spread > rec_val
+                    
+                    return rec_val, is_capped, process_spread, is_incapable
 
-                rec_L, capped_L = apply_visual_cap(math_L, visual_cap)
-                rec_a, capped_a = apply_visual_cap(math_a, visual_cap)
-                rec_b, capped_b = apply_visual_cap(math_b, visual_cap)
+                rec_L, cap_L, proc_L, incap_L = evaluate_tolerance(math_L, s_L, visual_cap)
+                rec_a, cap_a, proc_a, incap_a = evaluate_tolerance(math_a, s_a, visual_cap)
+                rec_b, cap_b, proc_b, incap_b = evaluate_tolerance(math_b, s_b, visual_cap)
                 
                 col_rl, col_ra, col_rb = st.columns(3)
                 
-                # Hàm hiển thị card kết quả
-                def render_card(col, label, val, is_capped, math_val):
-                    if is_capped:
-                        col.warning(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Capped from {math_val:.3f})*")
+                # Hàm hiển thị card đánh giá năng lực
+                def render_capability_card(col, label, rec_val, is_capped, math_val, proc_val, is_incapable):
+                    cap_text = f"Capped from {math_val:.3f}" if is_capped else "Optimal Math"
+                    
+                    if is_incapable:
+                        # Dữ liệu hiện tại biến động quá lớn, không thể ép vào giới hạn này
+                        col.error(f"**{label} Max Limit:**\n### ± {rec_val:.3f}\n*({cap_text})*\n\n⚠️ **Warning:** Process natural 3σ is **±{proc_val:.3f}**. Data fluctuation is too high to strictly meet this limit!")
                     else:
-                        col.info(f"**{label} Max Limit:**\n### ± {val:.3f}\n*(Optimal)*")
+                        # Dữ liệu hiện tại ổn định, hoàn toàn đáp ứng được giới hạn này
+                        col.success(f"**{label} Max Limit:**\n### ± {rec_val:.3f}\n*({cap_text})*\n\n✅ **Capable:** Process natural 3σ is **±{proc_val:.3f}**, which fits safely inside.")
 
-                render_card(col_rl, "ΔL", rec_L, capped_L, math_L)
-                render_card(col_ra, "Δa", rec_a, capped_a, math_a)
-                render_card(col_rb, "Δb", rec_b, capped_b, math_b)
+                render_capability_card(col_rl, "ΔL", rec_L, cap_L, math_L, proc_L, incap_L)
+                render_capability_card(col_ra, "Δa", rec_a, cap_a, math_a, proc_a, incap_a)
+                render_capability_card(col_rb, "Δb", rec_b, cap_b, math_b, proc_b, incap_b)
                 
-                st.caption(f"*Note: Mathematical distribution is capped at a strict maximum of **±{visual_cap:.3f}** per individual factor to prevent naked-eye color differences (Visual JND).*")
             else:
                 st.warning("Data variance is zero. Cannot generate proportional recommendations.")
 # =========================================================
@@ -926,6 +933,7 @@ elif app_mode == "🎛️ Control Limit Calculator":
     
     # Hiển thị công thức minh hoạ (Tùy chọn)
     st.latex(r"\Delta E = \sqrt{\Delta L^2 + \Delta a^2 + \Delta b^2}")
+
 
 
 
